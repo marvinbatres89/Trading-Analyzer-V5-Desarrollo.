@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <meta
+    name="description"
+    content="Herramienta de análisis de índices sintéticos de Deriv."
+  >
+
+  <title>Trading Analyzer V4</title>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <header class="encabezado">
+    <div>
+      <p class="version">TRADING ANALYZER V4 · BUILD 1.0</p>
+      <h1>Analizador de Mercado</h1>
+
+      <p class="descripcion">
+        Monitoreo de índices sintéticos con datos en tiempo real.
+      </p>
+    </div>
+
+    <div
+      id="estadoConexion"
+      class="estado-conexion desconectado"
+    >
+      <span class="punto-estado"></span>
+      <span id="textoConexion">Desconectado</span>
+    </div>
+  </header>
+
+  <main class="contenedor">
+
+    <section class="panel configuracion">
+
+      <div class="titulo-seccion">
+        <div>
+          <p class="etiqueta">CONFIGURACIÓN</p>
+          <h2>Selección del mercado</h2>
+        </div>
+      </div>
+
+      <div class="grupo-controles">
+
+        <label class="campo">
+          <span>Índice de volatilidad</span>
+
+          <select id="selectorIndice">
+            <option value="R_10">Volatility 10 Index</option>
+            <option value="R_25">Volatility 25 Index</option>
+            <option value="R_50">Volatility 50 Index</option>
+            <option value="R_75">Volatility 75 Index</option>
+            <option value="R_100">Volatility 100 Index</option>
+
+            <option value="1HZ10V">
+              Volatility 10 (1s) Index
+            </option>
+
+            <option value="1HZ25V">
+              Volatility 25 (1s) Index
+            </option>
+
+            <option value="1HZ50V">
+              Volatility 50 (1s) Index
+            </option>
+
+            <option value="1HZ75V">
+              Volatility 75 (1s) Index
+            </option>
+
+            <option value="1HZ100V" selected>
+              Volatility 100 (1s) Index
+            </option>
+          </select>
+        </label>
+
+        <label class="campo">
+          <span>Tipo de análisis</span>
+
+          <select id="selectorOperacion">
+            <option value="rise-fall">Sube / Baja</option>
+            <option value="even-odd">Par / Impar</option>
+            <option value="over-under">Más / Menos</option>
+          </select>
+        </label>
+
+      </div>
+
+      <div class="acciones">
+
+        <button
+          id="botonConectar"
+          class="boton principal"
+          type="button"
+        >
+          Conectar con Deriv
+        </button>
+
+        <button
+          id="botonDesconectar"
+          class="boton secundario"
+          type="button"
+          disabled
+        >
+          Desconectar
+        </button>
+
+      </div>
+
+    </section>
+
+    <section class="panel mercado">
+
+      <div class="titulo-seccion">
+        <div>
+          <p class="etiqueta">MERCADO EN VIVO</p>
+          <h2 id="nombreIndice">Volatility 100 (1s) Index</h2>
+        </div>
+
+        <span id="mercadoEstado" class="insignia">
+          Esperando conexión
+        </span>
+      </div>
+
+      <div class="tarjetas">
+
+        <article class="tarjeta precio">
+          <p>Precio actual</p>
+          <strong id="precioActual">--</strong>
+          <small id="horaActualizacion">
+            Sin información
+          </small>
+        </article>
+
+        <article class="tarjeta">
+          <p>Ticks recibidos</p>
+          <strong id="contadorTicks">0</strong>
+          <small>Desde la última conexión</small>
+        </article>
+
+        <article class="tarjeta">
+          <p>Último dígito</p>
+          <strong id="ultimoDigito">--</strong>
+          <small id="tipoUltimoDigito">
+            Esperando datos
+          </small>
+        </article>
+
+      </div>
+
+    </section>
+
+    <section class="panel indicadores">
+
+      <div class="titulo-seccion">
+        <div>
+          <p class="etiqueta">INDICADORES</p>
+          <h2>Análisis técnico</h2>
+        </div>
+      </div>
+
+      <div class="tarjetas">
+
+        <article class="tarjeta">
+          <p>Tendencia</p>
+          <strong id="tendencia">Esperando</strong>
+          <small>Dirección estimada del mercado</small>
+        </article>
+
+        <article class="tarjeta">
+          <p>RSI</p>
+          <strong id="rsi">--</strong>
+          <small>Índice de fuerza relativa</small>
+        </article>
+
+        <article class="tarjeta">
+          <p>Volatilidad</p>
+          <strong id="volatilidad">--</strong>
+          <small>Variación reciente del precio</small>
+        </article>
+
+      </div>
+
+    </section>
+
+    <section class="panel diagnostico">
+
+      <div class="titulo-seccion">
+        <div>
+          <p class="etiqueta">DIAGNÓSTICO</p>
+          <h2>Estado del sistema</h2>
+        </div>
+      </div>
+
+      <div class="lista-diagnostico">
+
+        <div class="fila-diagnostico">
+          <span>Aplicación</span>
+          <strong id="estadoAplicacion">
+            Iniciada correctamente
+          </strong>
+        </div>
+
+        <div class="fila-diagnostico">
+          <span>Servidor Deriv</span>
+          <strong id="estadoServidor">
+            Sin conexión
+          </strong>
+        </div>
+
+        <div class="fila-diagnostico">
+          <span>Suscripción</span>
+          <strong id="estadoSuscripcion">
+            Inactiva
+          </strong>
+        </div>
+
+        <div class="fila-diagnostico">
+          <span>Símbolo activo</span>
+          <strong id="simboloActivo">
+            1HZ100V
+          </strong>
+        </div>
+
+        <div class="fila-diagnostico">
+          <span>Último mensaje</span>
+          <strong id="ultimoMensaje">
+            Aplicación preparada
+          </strong>
+        </div>
+
+      </div>
+
+    </section>
+
+    <section class="panel registro">
+
+      <div class="titulo-seccion">
+        <div>
+          <p class="etiqueta">REGISTRO</p>
+          <h2>Actividad reciente</h2>
+        </div>
+
+        <button
+          id="botonLimpiarRegistro"
+          class="boton pequeno"
+          type="button"
+        >
+          Limpiar
+        </button>
+      </div>
+
+      <div id="registroActividad" class="registro-actividad">
+        <p>Trading Analyzer V4 iniciado.</p>
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer class="pie">
+    <p>
+      Herramienta informativa para análisis de mercado.
+      No garantiza resultados ni ganancias.
+    </p>
+  </footer>
+
+  <script src="deriv-api.js"></script>
+  <script src="app.js"></script>
+
+</body>
+</html>
