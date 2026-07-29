@@ -323,9 +323,16 @@ const CONFIGURACION = {
 
   idiomaVoz: "es-SV",
 
-  velocidadVoz: 0.95
+  velocidadVoz: 0.95,
 
-};
+  confianzaMinimaAlerta: 70,
+
+  tiempoEntreAlertas: 15000,
+
+  duracionCuentaRegresiva: 10
+
+}; 
+
 
 
 
