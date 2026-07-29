@@ -286,9 +286,20 @@ const estadoAplicacion = {
 
   indicadoresActuales: null,
 
-  historial: [],
+   historial: [],
 
-  vozActiva: true
+  vozActiva: true,
+
+  analisisAutomaticoActivo: true,
+
+  alertaActiva: false,
+
+  ultimaDireccionAlertada: "",
+
+  ultimaAlertaTiempo: 0,
+
+  temporizadorCuentaRegresiva: null
+ 
 
 };
 
