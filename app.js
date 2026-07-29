@@ -298,7 +298,9 @@ const estadoAplicacion = {
 
   ultimaAlertaTiempo: 0,
 
-  temporizadorCuentaRegresiva: null
+ultimoAnalisisAutomaticoTiempo: 0,
+
+temporizadorCuentaRegresiva: null
  
 
 };
@@ -327,9 +329,11 @@ const CONFIGURACION = {
 
   confianzaMinimaAlerta: 70,
 
-  tiempoEntreAlertas: 15000,
+tiempoEntreAlertas: 15000,
 
-  duracionCuentaRegresiva: 10
+intervaloAnalisisAutomatico: 3000,
+
+duracionCuentaRegresiva: 10
 
 }; 
 
@@ -2207,10 +2211,14 @@ function procesarTick(
       datosTick.pipSize;
 
 
-  actualizarIndicadores();
+    actualizarIndicadores();
 
 
   actualizarProgresoDatos();
+
+
+  ejecutarAnalisisAutomatico();
+
 
 }
 
@@ -3683,7 +3691,148 @@ function ejecutarAnalisis() {
 
 }
 
+/*
+=========================================================
+57A. EJECUTAR ANÁLISIS AUTOMÁTICO
+=========================================================
+*/
 
+function ejecutarAnalisisAutomatico() {
+
+  if (
+    !estadoAplicacion
+      .analisisAutomaticoActivo ||
+    estadoAplicacion
+      .alertaActiva
+  ) {
+
+    return;
+
+  }
+
+
+  if (
+    !estadoAplicacion.conectado
+  ) {
+
+    return;
+
+  }
+
+
+  const minimo =
+    obtenerMinimoTicks();
+
+
+  if (
+    estadoAplicacion
+      .precios.length <
+    minimo
+  ) {
+
+    return;
+
+  }
+
+
+  const tiempoActual =
+    Date.now();
+
+
+  const tiempoDesdeUltimoAnalisis =
+    tiempoActual -
+    estadoAplicacion
+      .ultimoAnalisisAutomaticoTiempo;
+
+
+  if (
+    tiempoDesdeUltimoAnalisis <
+    CONFIGURACION
+      .intervaloAnalisisAutomatico
+  ) {
+
+    return;
+
+  }
+
+
+  estadoAplicacion
+    .ultimoAnalisisAutomaticoTiempo =
+      tiempoActual;
+
+
+  actualizarIndicadores();
+
+
+  const resultado =
+    generarResultadoTecnico();
+
+
+  if (
+    !resultado ||
+    resultado.direccion ===
+      "ESPERAR" ||
+    resultado.confianza <
+      CONFIGURACION
+        .confianzaMinimaAlerta
+  ) {
+
+    return;
+
+  }
+
+
+  const tiempoDesdeUltimaAlerta =
+    tiempoActual -
+    estadoAplicacion
+      .ultimaAlertaTiempo;
+
+
+  if (
+    resultado.direccion ===
+      estadoAplicacion
+        .ultimaDireccionAlertada &&
+    tiempoDesdeUltimaAlerta <
+      CONFIGURACION
+        .tiempoEntreAlertas
+  ) {
+
+    return;
+
+  }
+
+
+  estadoAplicacion
+    .ultimaDireccionAlertada =
+      resultado.direccion;
+
+
+  estadoAplicacion
+    .ultimaAlertaTiempo =
+      tiempoActual;
+
+
+  mostrarResultado(
+    resultado
+  );
+
+
+  agregarResultadoHistorial(
+    resultado
+  );
+
+
+  registrarActividad(
+    "Señal automática detectada: " +
+    resultado.direccion +
+    " con " +
+    resultado.confianza +
+    "% de confianza técnica.",
+    "exito"
+);
+  iniciarAlertaAutomatica(resultado);
+
+}
 
 /*
 =========================================================
@@ -3794,7 +3943,192 @@ function leerResultadoPorVoz() {
 
   registrarActividad(
     "Leyendo el resultado por voz."
+  )/*
+=========================================================
+57B. HABLAR MENSAJE AUTOMÁTICO
+=========================================================
+*/
+
+function hablarMensajeAutomatico(
+  texto
+) {
+
+  if (
+    !estadoAplicacion.vozActiva ||
+    !(
+      "speechSynthesis" in window
+    )
+  ) {
+
+    return;
+
+  }
+
+
+  const mensaje =
+    new SpeechSynthesisUtterance(
+      texto
+    );
+
+
+  mensaje.lang =
+    CONFIGURACION.idiomaVoz;
+
+
+  mensaje.rate =
+    CONFIGURACION.velocidadVoz;
+
+
+  mensaje.pitch = 1;
+
+  mensaje.volume = 1;
+
+
+  window.speechSynthesis.speak(
+    mensaje
   );
+
+}
+
+
+
+/*
+=========================================================
+57C. INICIAR ALERTA AUTOMÁTICA
+=========================================================
+*/
+
+function iniciarAlertaAutomatica(
+  resultado
+) {
+
+  if (
+    !resultado ||
+    estadoAplicacion.alertaActiva
+  ) {
+
+    return;
+
+  }
+
+
+  estadoAplicacion.alertaActiva =
+    true;
+
+
+  let segundosRestantes =
+    CONFIGURACION
+      .duracionCuentaRegresiva;
+
+
+  const direccionVoz =
+    resultado.direccion === "SUBE"
+      ? "subida"
+      : "bajada";
+
+
+  if (
+    "speechSynthesis" in window
+  ) {
+
+    window.speechSynthesis.cancel();
+
+  }
+
+
+  hablarMensajeAutomatico(
+    "Atención. Señal de " +
+    direccionVoz +
+    " detectada. Tienes diez segundos para realizar la operación."
+  );
+
+
+  if (
+    interfaz.vigenciaSenal
+  ) {
+
+    interfaz.vigenciaSenal
+      .textContent =
+        "Tiempo para entrar: " +
+        segundosRestantes +
+        " segundos";
+
+  }
+
+
+  clearInterval(
+    estadoAplicacion
+      .temporizadorCuentaRegresiva
+  );
+
+
+  estadoAplicacion
+    .temporizadorCuentaRegresiva =
+      setInterval(
+        () => {
+
+          segundosRestantes--;
+
+
+          if (
+            interfaz.vigenciaSenal
+          ) {
+
+            interfaz.vigenciaSenal
+              .textContent =
+                segundosRestantes > 0
+                  ? "Tiempo para entrar: " +
+                    segundosRestantes +
+                    " segundos"
+                  : "Tiempo de entrada terminado";
+
+          }
+
+
+          if (
+            segundosRestantes > 0
+          ) {
+
+            hablarMensajeAutomatico(
+              String(
+                segundosRestantes
+              )
+            );
+
+            return;
+
+          }
+
+
+          clearInterval(
+            estadoAplicacion
+              .temporizadorCuentaRegresiva
+          );
+
+
+          estadoAplicacion
+            .temporizadorCuentaRegresiva =
+              null;
+
+
+          estadoAplicacion.alertaActiva =
+            false;
+
+
+          hablarMensajeAutomatico(
+            "Cero. Tiempo terminado."
+          );
+
+
+          registrarActividad(
+            "La ventana de entrada automática terminó."
+          );
+
+        },
+        1000
+      );
+
+};
 
 }
 
