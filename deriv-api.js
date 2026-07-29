@@ -14,7 +14,8 @@ Responsabilidad:
 
 
 const URL_DERIV =
-  "wss://ws.binaryws.com/websockets/v3";
+  "wss://api.derivws.com/trading/v1/op
+  tions/ws/public";
 
 
 const TIEMPO_RECONEXION = 3000;
