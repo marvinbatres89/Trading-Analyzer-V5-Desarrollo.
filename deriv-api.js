@@ -14,8 +14,7 @@ Responsabilidad:
 
 
 const URL_DERIV =
-  "wss://api.derivws.com/trading/v1/op
-  tions/ws/public";
+  "wss://api.derivws.com/trading/v1/options/ws/public";
 
 
 const TIEMPO_RECONEXION = 3000;
