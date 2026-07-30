@@ -3745,7 +3745,18 @@ function ejecutarAnalisis() {
     "% de confianza técnica.",
     "exito"
   );
+if (
+  resultado.direccion !== "ESPERAR" &&
+  resultado.confianza >=
+    CONFIGURACION.confianzaMinimaAlerta
+) {
 
+  iniciarAlertaAutomatica(
+    resultado
+  );
+
+}
+  
 }
 
 /*
