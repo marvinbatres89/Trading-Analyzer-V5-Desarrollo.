@@ -4021,7 +4021,7 @@ function leerResultadoPorVoz() {
 =========================================================
 */
 
-function hablarMensajeAutomatico(
+function hablarMensajeAutomatica(
   texto
 ) {
 
@@ -4199,8 +4199,6 @@ function iniciarAlertaAutomatica(
         },
         1000
       );
-
-};
 
 }
 
