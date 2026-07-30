@@ -4011,7 +4011,11 @@ function leerResultadoPorVoz() {
 
   registrarActividad(
     "Leyendo el resultado por voz."
-  )/*
+   );
+
+} 
+
+  /*
 =========================================================
 57B. HABLAR MENSAJE AUTOMÁTICO
 =========================================================
