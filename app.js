@@ -996,7 +996,63 @@ function limpiarDatosMercado() {
   actualizarProgresoDatos();
 
 }
+/*
+=========================================================
+13A. ACTIVAR VOZ DEL NAVEGADOR
+=========================================================
+*/
 
+function activarVozNavegador() {
+
+  if (
+    !(
+      "speechSynthesis" in window
+    )
+  ) {
+
+    registrarActividad(
+      "Este navegador no permite la función de voz.",
+      "advertencia"
+    );
+
+    return;
+
+  }
+
+
+  window.speechSynthesis.cancel();
+
+  window.speechSynthesis.resume();
+
+
+  const mensajePrueba =
+    new SpeechSynthesisUtterance(
+      "Voz automática activada."
+    );
+
+
+  mensajePrueba.lang =
+    CONFIGURACION.idiomaVoz;
+
+
+  mensajePrueba.rate =
+    CONFIGURACION.velocidadVoz;
+
+
+  mensajePrueba.volume = 1;
+
+
+  window.speechSynthesis.speak(
+    mensajePrueba
+  );
+
+
+  registrarActividad(
+    "Voz automática habilitada.",
+    "exito"
+  );
+
+}
 
 
 /*
@@ -1007,8 +1063,9 @@ function limpiarDatosMercado() {
 
 function conectarConDeriv() {
 
-  actualizarNombreMercado();
+  activarVozNavegador();
 
+  actualizarNombreMercado();
 
   const simbolo =
     estadoAplicacion
