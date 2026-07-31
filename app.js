@@ -1,13 +1,15 @@
 /*
 =========================================================
-TRADING ANALYZER V5
+TRADING ANALYZER V6
 Archivo: app.js
 
 PARTE 1 DE 4
 - Importación de Deriv API
 - Elementos de la interfaz
-- Estado general
-- Funciones básicas
+- Estado general de V6
+- Configuración de mercados y estrategias
+- Sistema central de voz
+- Sincronización y limpieza segura
 - Preparación de la conexión
 =========================================================
 */
@@ -18,20 +20,26 @@ import { derivAPI } from "./deriv-api.js";
 
 /*
 =========================================================
-1. FUNCIÓN PARA BUSCAR ELEMENTOS DEL HTML
+1. BUSCAR ELEMENTOS DEL HTML
 =========================================================
 */
 
-function obtenerElemento(id) {
+function obtenerElemento(
+  id,
+  obligatorio = true
+) {
 
   const elemento =
     document.getElementById(id);
 
 
-  if (!elemento) {
+  if (
+    !elemento &&
+    obligatorio
+  ) {
 
     console.warn(
-      "No se encontró el elemento:",
+      "No se encontró el elemento obligatorio:",
       id
     );
 
@@ -71,6 +79,22 @@ const interfaz = {
   botonDesconectar:
     obtenerElemento(
       "botonDesconectar"
+    ),
+
+  botonAnalizar:
+    obtenerElemento(
+      "botonAnalizar"
+    ),
+
+  botonVoz:
+    obtenerElemento(
+      "botonVoz"
+    ),
+
+  botonAjustes:
+    obtenerElemento(
+      "botonAjustes",
+      false
     ),
 
 
@@ -178,11 +202,6 @@ const interfaz = {
     ),
 
 
-  botonAnalizar:
-    obtenerElemento(
-      "botonAnalizar"
-    ),
-
   panelSenal:
     obtenerElemento(
       "panelSenal"
@@ -223,11 +242,12 @@ const interfaz = {
       "vigenciaSenal"
     ),
 
-
-  botonVoz:
+  cuentaRegresiva:
     obtenerElemento(
-      "botonVoz"
+      "cuentaRegresiva",
+      false
     ),
+
 
   botonLimpiarHistorial:
     obtenerElemento(
@@ -248,6 +268,13 @@ const interfaz = {
   registroActividad:
     obtenerElemento(
       "registroActividad"
+    ),
+
+
+  contenedorGrafico:
+    obtenerElemento(
+      "contenedorGrafico",
+      false
     )
 
 };
@@ -256,52 +283,50 @@ const interfaz = {
 
 /*
 =========================================================
-3. ESTADO GENERAL DE LA APLICACIÓN
+3. CONFIGURACIÓN GENERAL
 =========================================================
 */
 
-const estadoAplicacion = {
+const CONFIGURACION = {
 
-  conectado: false,
+  version:
+    "6.0",
 
-  conectando: false,
+  maximoPreciosGuardados:
+    250,
 
-  simboloActual: "",
+  maximoDigitosGuardados:
+    120,
 
-  nombreMercadoActual: "",
+  minimoTicksRapido:
+    12,
 
-  precios: [],
+  minimoTicksCompleto:
+    30,
 
-  ticksRecibidos: 0,
+  maximoHistorial:
+    10,
 
-  precioAnterior: null,
+  duracionRapidaSegundos:
+    10,
 
-  ultimoPrecio: null,
+  duracionCompletaSegundos:
+    30,
 
-  ultimoEpoch: null,
+  intervaloAnalisisDuplicado:
+    1500,
 
-  ultimoPipSize: null,
+  idiomaVoz:
+    "es-SV",
 
-  ultimoResultado: null,
+  velocidadVoz:
+    0.95,
 
-  indicadoresActuales: null,
+  tonoVoz:
+    1,
 
-   historial: [],
-
-  vozActiva: true,
-
-  analisisAutomaticoActivo: true,
-
-  alertaActiva: false,
-
-  ultimaDireccionAlertada: "",
-
-  ultimaAlertaTiempo: 0,
-
-ultimoAnalisisAutomaticoTiempo: 0,
-
-temporizadorCuentaRegresiva: null
- 
+  volumenVoz:
+    1
 
 };
 
@@ -309,40 +334,7 @@ temporizadorCuentaRegresiva: null
 
 /*
 =========================================================
-4. CONFIGURACIÓN GENERAL
-=========================================================
-*/
-
-const CONFIGURACION = {
-
-  maximoPreciosGuardados: 200,
-
-  minimoTicksRapido: 12,
-
-  minimoTicksCompleto: 30,
-
-  maximoHistorial: 10,
-
-  idiomaVoz: "es-SV",
-
-  velocidadVoz: 0.95,
-
-  confianzaMinimaAlerta: 70,
-
-tiempoEntreAlertas: 15000,
-
-intervaloAnalisisAutomatico: 3000,
-
-duracionCuentaRegresiva: 10
-
-}; 
-
-
-
-
-/*
-=========================================================
-5. NOMBRES DE LOS MERCADOS
+4. NOMBRES DE LOS MERCADOS
 =========================================================
 */
 
@@ -385,7 +377,137 @@ const NOMBRES_MERCADOS = {
 
 /*
 =========================================================
-6. OBTENER NOMBRE DEL MERCADO
+5. NOMBRES DE LAS ESTRATEGIAS
+=========================================================
+*/
+
+const NOMBRES_ESTRATEGIAS = {
+
+  rise_fall:
+    "Rise / Fall",
+
+  even_odd:
+    "Par / Impar",
+
+  over_under:
+    "Más / Menos",
+
+  match:
+    "Match"
+
+};
+
+
+
+/*
+=========================================================
+6. ESTADO GENERAL DE LA APLICACIÓN
+=========================================================
+*/
+
+const estadoAplicacion = {
+
+  conectado:
+    false,
+
+  conectando:
+    false,
+
+  analizando:
+    false,
+
+
+  simboloActual:
+    "",
+
+  nombreMercadoActual:
+    "",
+
+  estrategiaActual:
+    "rise_fall",
+
+  nombreEstrategiaActual:
+    "Rise / Fall",
+
+  modoActual:
+    "rapido",
+
+
+  precios:
+    [],
+
+  ultimosDigitos:
+    [],
+
+  ticksRecibidos:
+    0,
+
+  precioAnterior:
+    null,
+
+  ultimoPrecio:
+    null,
+
+  ultimoEpoch:
+    null,
+
+  ultimoPipSize:
+    null,
+
+  ultimoPrecioFormateado:
+    "--",
+
+
+  ultimoResultado:
+    null,
+
+  indicadoresActuales:
+    null,
+
+  historial:
+    [],
+
+
+  vozActiva:
+    true,
+
+  vozDisponible:
+    (
+      "speechSynthesis" in window &&
+      "SpeechSynthesisUtterance" in window
+    ),
+
+
+  temporizadorSenal:
+    null,
+
+  segundosRestantes:
+    0,
+
+  senalActiva:
+    false,
+
+
+  ultimoAnalisisEpoch:
+    0,
+
+  claveUltimoAnalisis:
+    "",
+
+
+  versionDatos:
+    0,
+
+  versionAnalisis:
+    0
+
+};
+
+
+
+/*
+=========================================================
+7. OBTENER NOMBRE DEL MERCADO
 =========================================================
 */
 
@@ -409,7 +531,33 @@ function obtenerNombreMercado(
 
 /*
 =========================================================
-7. FORMATEAR LA HORA
+8. OBTENER NOMBRE DE LA ESTRATEGIA
+=========================================================
+*/
+
+function obtenerNombreEstrategia(
+  estrategia
+) {
+
+  return (
+
+    NOMBRES_ESTRATEGIAS[
+      estrategia
+    ] ||
+
+    estrategia ||
+
+    "Estrategia desconocida"
+
+  );
+
+}
+
+
+
+/*
+=========================================================
+9. FORMATEAR LA HORA
 =========================================================
 */
 
@@ -417,22 +565,10 @@ function obtenerHora(
   epoch = null
 ) {
 
-  let fecha;
-
-
-  if (
+  const fecha =
     Number.isFinite(epoch)
-  ) {
-
-    fecha =
-      new Date(epoch * 1000);
-
-  } else {
-
-    fecha =
-      new Date();
-
-  }
+      ? new Date(epoch * 1000)
+      : new Date();
 
 
   return fecha.toLocaleTimeString(
@@ -455,7 +591,7 @@ function obtenerHora(
 
 /*
 =========================================================
-8. REGISTRO DE ACTIVIDAD
+10. REGISTRO DE ACTIVIDAD
 =========================================================
 */
 
@@ -490,7 +626,9 @@ function registrarActividad(
     tipo === "advertencia"
   ) {
 
-    linea.classList.add(tipo);
+    linea.classList.add(
+      tipo
+    );
 
   }
 
@@ -503,12 +641,24 @@ function registrarActividad(
   while (
     interfaz.registroActividad
       .children.length >
-    45
+    50
   ) {
 
-    interfaz.registroActividad
-      .lastElementChild
-      .remove();
+    const ultimoElemento =
+      interfaz.registroActividad
+        .lastElementChild;
+
+
+    if (
+      !ultimoElemento
+    ) {
+
+      break;
+
+    }
+
+
+    ultimoElemento.remove();
 
   }
 
@@ -518,7 +668,285 @@ function registrarActividad(
 
 /*
 =========================================================
-9. OBTENER EL MÍNIMO DE TICKS
+11. HABLAR MENSAJE
+=========================================================
+*/
+
+function hablarMensaje(
+  texto,
+  forzar = false
+) {
+
+  if (
+    !texto ||
+    typeof texto !==
+      "string"
+  ) {
+
+    return false;
+
+  }
+
+
+  if (
+    !estadoAplicacion
+      .vozDisponible
+  ) {
+
+    return false;
+
+  }
+
+
+  if (
+    !estadoAplicacion
+      .vozActiva &&
+    !forzar
+  ) {
+
+    return false;
+
+  }
+
+
+  try {
+
+    window.speechSynthesis.cancel();
+
+
+    const mensaje =
+      new SpeechSynthesisUtterance(
+        texto
+      );
+
+
+    mensaje.lang =
+      CONFIGURACION
+        .idiomaVoz;
+
+
+    mensaje.rate =
+      CONFIGURACION
+        .velocidadVoz;
+
+
+    mensaje.pitch =
+      CONFIGURACION
+        .tonoVoz;
+
+
+    mensaje.volume =
+      CONFIGURACION
+        .volumenVoz;
+
+
+    window.speechSynthesis.speak(
+      mensaje
+    );
+
+
+    return true;
+
+  } catch (error) {
+
+    registrarActividad(
+      "No fue posible reproducir el mensaje de voz.",
+      "advertencia"
+    );
+
+
+    console.warn(
+      "Error de voz:",
+      error
+    );
+
+
+    return false;
+
+  }
+
+}
+
+
+
+/*
+=========================================================
+12. DETENER MENSAJES DE VOZ
+=========================================================
+*/
+
+function detenerVoz() {
+
+  if (
+    !estadoAplicacion
+      .vozDisponible
+  ) {
+
+    return;
+
+  }
+
+
+  try {
+
+    window.speechSynthesis.cancel();
+
+  } catch (error) {
+
+    console.warn(
+      "No fue posible detener la voz:",
+      error
+    );
+
+  }
+
+}
+
+
+
+/*
+=========================================================
+13. ACTUALIZAR BOTÓN DE VOZ
+=========================================================
+*/
+
+function actualizarBotonVoz() {
+
+  if (
+    !interfaz.botonVoz
+  ) {
+
+    return;
+
+  }
+
+
+  if (
+    !estadoAplicacion
+      .vozDisponible
+  ) {
+
+    interfaz.botonVoz
+      .textContent =
+        "🔇 Voz no disponible";
+
+
+    interfaz.botonVoz
+      .disabled =
+        true;
+
+
+    interfaz.botonVoz
+      .setAttribute(
+        "aria-pressed",
+        "false"
+      );
+
+
+    return;
+
+  }
+
+
+  interfaz.botonVoz
+    .disabled =
+      false;
+
+
+  interfaz.botonVoz
+    .textContent =
+      estadoAplicacion
+        .vozActiva
+        ? "🔊 Voz activa"
+        : "🔇 Voz silenciada";
+
+
+  interfaz.botonVoz
+    .setAttribute(
+      "aria-pressed",
+      String(
+        estadoAplicacion
+          .vozActiva
+      )
+    );
+
+
+  interfaz.botonVoz
+    .classList.toggle(
+      "activo",
+      estadoAplicacion
+        .vozActiva
+    );
+
+}
+
+
+
+/*
+=========================================================
+14. ACTIVAR O SILENCIAR VOZ
+=========================================================
+*/
+
+function alternarVoz() {
+
+  if (
+    !estadoAplicacion
+      .vozDisponible
+  ) {
+
+    registrarActividad(
+      "Este navegador no permite utilizar el asistente de voz.",
+      "advertencia"
+    );
+
+    return;
+
+  }
+
+
+  estadoAplicacion
+    .vozActiva =
+      !estadoAplicacion
+        .vozActiva;
+
+
+  detenerVoz();
+
+
+  actualizarBotonVoz();
+
+
+  if (
+    estadoAplicacion
+      .vozActiva
+  ) {
+
+    registrarActividad(
+      "Asistente de voz activado.",
+      "exito"
+    );
+
+
+    hablarMensaje(
+      "Asistente de voz activado."
+    );
+
+  } else {
+
+    registrarActividad(
+      "Asistente de voz silenciado."
+    );
+
+  }
+
+}
+
+
+
+/*
+=========================================================
+15. OBTENER MÍNIMO DE TICKS
 =========================================================
 */
 
@@ -545,7 +973,34 @@ function obtenerMinimoTicks() {
 
 /*
 =========================================================
-10. CAMBIAR ESTADO VISUAL DE CONEXIÓN
+16. OBTENER DURACIÓN DE LA SEÑAL
+=========================================================
+*/
+
+function obtenerDuracionSenal() {
+
+  if (
+    interfaz.selectorModo &&
+    interfaz.selectorModo.value ===
+      "completo"
+  ) {
+
+    return CONFIGURACION
+      .duracionCompletaSegundos;
+
+  }
+
+
+  return CONFIGURACION
+    .duracionRapidaSegundos;
+
+}
+
+
+
+/*
+=========================================================
+17. CAMBIAR ESTADO VISUAL DE CONEXIÓN
 =========================================================
 */
 
@@ -613,38 +1068,62 @@ function mostrarEstadoConexion(
 
 /*
 =========================================================
-11. ACTUALIZAR NOMBRE DEL MERCADO
+18. SINCRONIZAR SELECCIÓN ACTUAL
 =========================================================
 */
 
-function actualizarNombreMercado() {
+function sincronizarSeleccionActual() {
 
   if (
-    !interfaz.selectorIndice
+    interfaz.selectorIndice
   ) {
 
-    return;
+    estadoAplicacion
+      .simboloActual =
+        interfaz.selectorIndice
+          .value;
+
+
+    estadoAplicacion
+      .nombreMercadoActual =
+        obtenerNombreMercado(
+          estadoAplicacion
+            .simboloActual
+        );
 
   }
 
 
-  const simbolo =
-    interfaz.selectorIndice.value;
+  if (
+    interfaz.selectorOperacion
+  ) {
+
+    estadoAplicacion
+      .estrategiaActual =
+        interfaz.selectorOperacion
+          .value;
 
 
-  const nombre =
-    obtenerNombreMercado(
-      simbolo
-    );
+    estadoAplicacion
+      .nombreEstrategiaActual =
+        obtenerNombreEstrategia(
+          estadoAplicacion
+            .estrategiaActual
+        );
+
+  }
 
 
-  estadoAplicacion.simboloActual =
-    simbolo;
+  if (
+    interfaz.selectorModo
+  ) {
 
+    estadoAplicacion
+      .modoActual =
+        interfaz.selectorModo
+          .value;
 
-  estadoAplicacion
-    .nombreMercadoActual =
-      nombre;
+  }
 
 
   if (
@@ -653,7 +1132,8 @@ function actualizarNombreMercado() {
 
     interfaz.nombreIndice
       .textContent =
-        nombre;
+        estadoAplicacion
+          .nombreMercadoActual;
 
   }
 
@@ -663,7 +1143,230 @@ function actualizarNombreMercado() {
 
 /*
 =========================================================
-12. ACTUALIZAR PROGRESO DE DATOS
+19. DETENER CUENTA REGRESIVA
+=========================================================
+*/
+
+function detenerCuentaRegresiva(
+  marcarFinalizada = false
+) {
+
+  if (
+    estadoAplicacion
+      .temporizadorSenal
+  ) {
+
+    clearInterval(
+      estadoAplicacion
+        .temporizadorSenal
+    );
+
+  }
+
+
+  estadoAplicacion
+    .temporizadorSenal =
+      null;
+
+
+  estadoAplicacion
+    .segundosRestantes =
+      0;
+
+
+  estadoAplicacion
+    .senalActiva =
+      false;
+
+
+  if (
+    interfaz.cuentaRegresiva
+  ) {
+
+    interfaz.cuentaRegresiva
+      .textContent =
+        marcarFinalizada
+          ? "Tiempo finalizado"
+          : "--";
+
+  }
+
+}
+
+
+
+/*
+=========================================================
+20. LIMPIAR MOTIVOS DEL RESULTADO
+=========================================================
+*/
+
+function limpiarMotivosResultado() {
+
+  if (
+    interfaz.prediccionMotivos
+  ) {
+
+    interfaz.prediccionMotivos
+      .innerHTML = "";
+
+  }
+
+}
+
+
+
+/*
+=========================================================
+21. AGREGAR MOTIVO AL RESULTADO
+=========================================================
+*/
+
+function agregarMotivoResultado(
+  texto
+) {
+
+  if (
+    !interfaz.prediccionMotivos
+  ) {
+
+    return;
+
+  }
+
+
+  const elemento =
+    document.createElement("li");
+
+
+  elemento.textContent =
+    texto;
+
+
+  interfaz.prediccionMotivos
+    .appendChild(
+      elemento
+    );
+
+}
+
+
+
+/*
+=========================================================
+22. REINICIAR PANEL DE SEÑAL
+=========================================================
+*/
+
+function reiniciarPanelSenal(
+  mensaje =
+    "Conecta la herramienta para comenzar."
+) {
+
+  detenerCuentaRegresiva();
+
+
+  estadoAplicacion
+    .ultimoResultado =
+      null;
+
+
+  estadoAplicacion
+    .analizando =
+      false;
+
+
+  if (
+    interfaz.panelSenal
+  ) {
+
+    interfaz.panelSenal
+      .className =
+        "panel-senal neutral";
+
+  }
+
+
+  if (
+    interfaz.prediccionEstado
+  ) {
+
+    interfaz.prediccionEstado
+      .textContent =
+        "SIN ANALIZAR";
+
+  }
+
+
+  if (
+    interfaz.prediccionTitulo
+  ) {
+
+    interfaz.prediccionTitulo
+      .textContent =
+        "Esperando análisis";
+
+  }
+
+
+  if (
+    interfaz.prediccionDireccion
+  ) {
+
+    interfaz.prediccionDireccion
+      .textContent =
+        "--";
+
+  }
+
+
+  if (
+    interfaz.prediccionConfianza
+  ) {
+
+    interfaz.prediccionConfianza
+      .textContent =
+        "--";
+
+  }
+
+
+  if (
+    interfaz.barraConfianza
+  ) {
+
+    interfaz.barraConfianza
+      .style.width =
+        "0%";
+
+  }
+
+
+  if (
+    interfaz.vigenciaSenal
+  ) {
+
+    interfaz.vigenciaSenal
+      .textContent =
+        "Vigencia estimada: --";
+
+  }
+
+
+  limpiarMotivosResultado();
+
+
+  agregarMotivoResultado(
+    mensaje
+  );
+
+}
+
+
+
+/*
+=========================================================
+23. ACTUALIZAR PROGRESO DE DATOS
 =========================================================
 */
 
@@ -677,20 +1380,20 @@ function actualizarProgresoDatos() {
     Math.min(
       estadoAplicacion
         .precios.length,
-
       minimo
     );
 
 
   const porcentaje =
-    Math.min(
-      100,
-
-      (
-        cantidad /
-        minimo
-      ) * 100
-    );
+    minimo > 0
+      ? Math.min(
+          100,
+          (
+            cantidad /
+            minimo
+          ) * 100
+        )
+      : 0;
 
 
   if (
@@ -765,7 +1468,9 @@ function actualizarProgresoDatos() {
 
       interfaz.textoProgreso
         .textContent =
-          "Preparando análisis";
+          "Preparando " +
+          estadoAplicacion
+            .nombreEstrategiaActual;
 
     }
 
@@ -816,7 +1521,7 @@ function actualizarProgresoDatos() {
 
     interfaz.botonAnalizar
       .textContent =
-        "Analizar ahora";
+        "🔍 Analizar ahora";
 
   }
 
@@ -826,31 +1531,70 @@ function actualizarProgresoDatos() {
 
 /*
 =========================================================
-13. LIMPIAR DATOS DEL MERCADO
+24. LIMPIAR DATOS DEL MERCADO
 =========================================================
 */
 
-function limpiarDatosMercado() {
+function limpiarDatosMercado(
+  motivo =
+    "Esperando nuevos datos"
+) {
 
-  estadoAplicacion.precios = [];
+  detenerCuentaRegresiva();
+
+  detenerVoz();
+
+
+  estadoAplicacion
+    .versionDatos++;
+
+
+  estadoAplicacion
+    .precios = [];
+
+
+  estadoAplicacion
+    .ultimosDigitos = [];
+
 
   estadoAplicacion
     .ticksRecibidos = 0;
 
+
   estadoAplicacion
     .precioAnterior = null;
+
 
   estadoAplicacion
     .ultimoPrecio = null;
 
+
   estadoAplicacion
     .ultimoEpoch = null;
+
 
   estadoAplicacion
     .ultimoPipSize = null;
 
+
   estadoAplicacion
-    .indicadoresActuales = null;
+    .ultimoPrecioFormateado =
+      "--";
+
+
+  estadoAplicacion
+    .indicadoresActuales =
+      null;
+
+
+  estadoAplicacion
+    .ultimoAnalisisEpoch =
+      0;
+
+
+  estadoAplicacion
+    .claveUltimoAnalisis =
+      "";
 
 
   if (
@@ -858,7 +1602,8 @@ function limpiarDatosMercado() {
   ) {
 
     interfaz.precioActual
-      .textContent = "--";
+      .textContent =
+        "--";
 
 
     interfaz.precioActual
@@ -873,7 +1618,8 @@ function limpiarDatosMercado() {
   ) {
 
     interfaz.contadorTicks
-      .textContent = "0";
+      .textContent =
+        "0";
 
   }
 
@@ -883,7 +1629,8 @@ function limpiarDatosMercado() {
   ) {
 
     interfaz.ultimoDigito
-      .textContent = "--";
+      .textContent =
+        "--";
 
   }
 
@@ -893,7 +1640,8 @@ function limpiarDatosMercado() {
   ) {
 
     interfaz.horaActualizacion
-      .textContent = "--";
+      .textContent =
+        "--";
 
   }
 
@@ -914,7 +1662,8 @@ function limpiarDatosMercado() {
   ) {
 
     interfaz.tendencia
-      .textContent = "--";
+      .textContent =
+        "--";
 
   }
 
@@ -924,7 +1673,8 @@ function limpiarDatosMercado() {
   ) {
 
     interfaz.rsi
-      .textContent = "--";
+      .textContent =
+        "--";
 
   }
 
@@ -934,7 +1684,8 @@ function limpiarDatosMercado() {
   ) {
 
     interfaz.momentum
-      .textContent = "--";
+      .textContent =
+        "--";
 
   }
 
@@ -944,7 +1695,8 @@ function limpiarDatosMercado() {
   ) {
 
     interfaz.volatilidad
-      .textContent = "--";
+      .textContent =
+        "--";
 
   }
 
@@ -955,7 +1707,7 @@ function limpiarDatosMercado() {
 
     interfaz.detalleTendencia
       .textContent =
-        "Esperando datos";
+        motivo;
 
   }
 
@@ -966,7 +1718,7 @@ function limpiarDatosMercado() {
 
     interfaz.detalleRsi
       .textContent =
-        "Esperando datos";
+        motivo;
 
   }
 
@@ -977,7 +1729,7 @@ function limpiarDatosMercado() {
 
     interfaz.detalleMomentum
       .textContent =
-        "Esperando datos";
+        motivo;
 
   }
 
@@ -988,30 +1740,46 @@ function limpiarDatosMercado() {
 
     interfaz.detalleVolatilidad
       .textContent =
-        "Esperando datos";
+        motivo;
 
   }
+
+
+  reiniciarPanelSenal(
+    "Esperando datos de " +
+    estadoAplicacion
+      .nombreMercadoActual +
+    " para " +
+    estadoAplicacion
+      .nombreEstrategiaActual +
+    "."
+  );
 
 
   actualizarProgresoDatos();
 
 }
+
+
+
 /*
 =========================================================
-13A. ACTIVAR VOZ DEL NAVEGADOR
+25. CONECTAR CON DERIV
 =========================================================
 */
 
-function activarVozNavegador() {
+function conectarConDeriv() {
+
+  sincronizarSeleccionActual();
+
 
   if (
-    !(
-      "speechSynthesis" in window
-    )
+    estadoAplicacion.conectado ||
+    estadoAplicacion.conectando
   ) {
 
     registrarActividad(
-      "Este navegador no permite la función de voz.",
+      "La conexión ya está activa o en proceso.",
       "advertencia"
     );
 
@@ -1020,69 +1788,22 @@ function activarVozNavegador() {
   }
 
 
-  window.speechSynthesis.cancel();
-
-  window.speechSynthesis.resume();
-
-
-  const mensajePrueba =
-    new SpeechSynthesisUtterance(
-      "Voz automática activada."
-    );
-
-
-  mensajePrueba.lang =
-    CONFIGURACION.idiomaVoz;
-
-
-  mensajePrueba.rate =
-    CONFIGURACION.velocidadVoz;
-
-
-  mensajePrueba.volume = 1;
-
-
-  window.speechSynthesis.speak(
-    mensajePrueba
-  );
-
-
-  registrarActividad(
-    "Voz automática habilitada.",
-    "exito"
-  );
-
-}
-
-
-/*
-=========================================================
-14. CONECTAR CON DERIV
-=========================================================
-*/
-
-function conectarConDeriv() {
-
-  activarVozNavegador();
-
-  actualizarNombreMercado();
-
-  const simbolo =
-    estadoAplicacion
-      .simboloActual;
-
-
   registrarActividad(
     "Solicitando conexión para " +
-    obtenerNombreMercado(
-      simbolo
-    ) +
+    estadoAplicacion
+      .nombreMercadoActual +
     "."
   );
 
 
+  hablarMensaje(
+    "Conectando con Deriv."
+  );
+
+
   derivAPI.conectar(
-    simbolo
+    estadoAplicacion
+      .simboloActual
   );
 
 }
@@ -1091,11 +1812,16 @@ function conectarConDeriv() {
 
 /*
 =========================================================
-15. DESCONECTAR DE DERIV
+26. DESCONECTAR DE DERIV
 =========================================================
 */
 
 function desconectarDeDeriv() {
+
+  detenerCuentaRegresiva();
+
+  detenerVoz();
+
 
   registrarActividad(
     "Cerrando conexión con Deriv."
@@ -1117,23 +1843,27 @@ LA PARTE 2 DEBE PEGARSE INMEDIATAMENTE DEBAJO.
 =========================================================
 */
 
+
 /*
 =========================================================
-TRADING ANALYZER V5
+TRADING ANALYZER V6
 Archivo: app.js
 
 PARTE 2 DE 4
-- Recepción de precios
-- Actualización del mercado en vivo
-- Cálculo de indicadores
-- Preparación rápida del análisis
+- Recepción y validación de ticks
+- Precio y último dígito
+- Tendencia
+- RSI
+- Momentum
+- Volatilidad
+- Sincronización de mercado, estrategia y modo
 =========================================================
 */
 
 
 /*
 =========================================================
-16. CALCULAR PROMEDIO
+27. CALCULAR PROMEDIO
 =========================================================
 */
 
@@ -1174,7 +1904,7 @@ function calcularPromedio(
 
 /*
 =========================================================
-17. CALCULAR DESVIACIÓN ESTÁNDAR
+28. CALCULAR DESVIACIÓN ESTÁNDAR
 =========================================================
 */
 
@@ -1198,7 +1928,7 @@ function calcularDesviacion(
     );
 
 
-  const diferenciasCuadradas =
+  const diferencias =
     valores.map(
       (valor) => {
 
@@ -1213,7 +1943,7 @@ function calcularDesviacion(
 
   const varianza =
     calcularPromedio(
-      diferenciasCuadradas
+      diferencias
     );
 
 
@@ -1227,7 +1957,60 @@ function calcularDesviacion(
 
 /*
 =========================================================
-18. CALCULAR RSI
+29. OBTENER CONFIGURACIÓN DEL MODO
+=========================================================
+*/
+
+function obtenerConfiguracionModo() {
+
+  if (
+    estadoAplicacion
+      .modoActual ===
+      "completo"
+  ) {
+
+    return {
+
+      periodoRSI:
+        14,
+
+      ventanaTendencia:
+        30,
+
+      ventanaMomentum:
+        10,
+
+      ventanaVolatilidad:
+        30
+
+    };
+
+  }
+
+
+  return {
+
+    periodoRSI:
+      8,
+
+    ventanaTendencia:
+      12,
+
+    ventanaMomentum:
+      5,
+
+    ventanaVolatilidad:
+      12
+
+  };
+
+}
+
+
+
+/*
+=========================================================
+30. CALCULAR RSI
 =========================================================
 */
 
@@ -1275,9 +2058,12 @@ function calcularRSI(
       diferencia > 0
     ) {
 
-      ganancias += diferencia;
+      ganancias +=
+        diferencia;
 
-    } else {
+    } else if (
+      diferencia < 0
+    ) {
 
       perdidas +=
         Math.abs(
@@ -1297,6 +2083,16 @@ function calcularRSI(
   const promedioPerdidas =
     perdidas /
     periodo;
+
+
+  if (
+    promedioGanancias === 0 &&
+    promedioPerdidas === 0
+  ) {
+
+    return 50;
+
+  }
 
 
   if (
@@ -1328,7 +2124,7 @@ function calcularRSI(
 
 /*
 =========================================================
-19. CALCULAR TENDENCIA
+31. CALCULAR TENDENCIA
 =========================================================
 */
 
@@ -1342,44 +2138,54 @@ function calcularTendencia(
   ) {
 
     return {
+
       direccion:
         "Sin datos",
 
       cambio:
+        0,
+
+      fuerza:
         0
+
     };
 
   }
 
 
-  const cantidadVentana =
+  const configuracion =
+    obtenerConfiguracionModo();
+
+
+  const cantidad =
     Math.min(
-      30,
+      configuracion
+        .ventanaTendencia,
       precios.length
     );
 
 
-  const ventana =
+  const recientes =
     precios.slice(
-      -cantidadVentana
+      -cantidad
     );
 
 
   const mitad =
     Math.floor(
-      ventana.length / 2
+      recientes.length / 2
     );
 
 
   const primeraMitad =
-    ventana.slice(
+    recientes.slice(
       0,
       mitad
     );
 
 
   const segundaMitad =
-    ventana.slice(
+    recientes.slice(
       mitad
     );
 
@@ -1390,7 +2196,7 @@ function calcularTendencia(
     );
 
 
-  const promedioReciente =
+  const promedioActual =
     calcularPromedio(
       segundaMitad
     );
@@ -1401,11 +2207,16 @@ function calcularTendencia(
   ) {
 
     return {
+
       direccion:
         "Lateral",
 
       cambio:
+        0,
+
+      fuerza:
         0
+
     };
 
   }
@@ -1414,11 +2225,18 @@ function calcularTendencia(
   const cambio =
     (
       (
-        promedioReciente -
+        promedioActual -
         promedioAnterior
       ) /
       promedioAnterior
-    ) * 100;
+    ) *
+    100;
+
+
+  const fuerza =
+    Math.abs(
+      cambio
+    );
 
 
   let direccion =
@@ -1426,17 +2244,14 @@ function calcularTendencia(
 
 
   if (
-    cambio > 0.001
+    cambio > 0
   ) {
 
     direccion =
       "Alcista";
 
-  }
-
-
-  if (
-    cambio < -0.001
+  } else if (
+    cambio < 0
   ) {
 
     direccion =
@@ -1446,8 +2261,13 @@ function calcularTendencia(
 
 
   return {
+
     direccion,
-    cambio
+
+    cambio,
+
+    fuerza
+
   };
 
 }
@@ -1456,7 +2276,7 @@ function calcularTendencia(
 
 /*
 =========================================================
-20. CALCULAR MOMENTUM
+32. CALCULAR MOMENTUM
 =========================================================
 */
 
@@ -1464,27 +2284,35 @@ function calcularMomentum(
   precios
 ) {
 
+  const configuracion =
+    obtenerConfiguracionModo();
+
+
+  const periodo =
+    configuracion
+      .ventanaMomentum;
+
+
   if (
     !Array.isArray(precios) ||
-    precios.length < 3
+    precios.length <
+      periodo + 1
   ) {
 
     return {
+
       direccion:
         "Sin datos",
 
       valor:
+        0,
+
+      porcentaje:
         0
+
     };
 
   }
-
-
-  const distancia =
-    Math.min(
-      8,
-      precios.length - 1
-    );
 
 
   const precioActual =
@@ -1496,14 +2324,24 @@ function calcularMomentum(
   const precioAnterior =
     precios[
       precios.length -
-      distancia -
-      1
+      1 -
+      periodo
     ];
 
 
   const valor =
     precioActual -
     precioAnterior;
+
+
+  const porcentaje =
+    precioAnterior !== 0
+      ? (
+          valor /
+          precioAnterior
+        ) *
+        100
+      : 0;
 
 
   let direccion =
@@ -1517,10 +2355,7 @@ function calcularMomentum(
     direccion =
       "Positivo";
 
-  }
-
-
-  if (
+  } else if (
     valor < 0
   ) {
 
@@ -1531,8 +2366,13 @@ function calcularMomentum(
 
 
   return {
+
     direccion,
-    valor
+
+    valor,
+
+    porcentaje
+
   };
 
 }
@@ -1541,7 +2381,7 @@ function calcularMomentum(
 
 /*
 =========================================================
-21. CALCULAR VOLATILIDAD
+33. CALCULAR VOLATILIDAD
 =========================================================
 */
 
@@ -1549,63 +2389,65 @@ function calcularVolatilidad(
   precios
 ) {
 
+  const configuracion =
+    obtenerConfiguracionModo();
+
+
+  const cantidad =
+    Math.min(
+      configuracion
+        .ventanaVolatilidad,
+      precios.length
+    );
+
+
   if (
     !Array.isArray(precios) ||
-    precios.length < 5
+    cantidad < 5
   ) {
 
     return {
+
       nivel:
         "Sin datos",
 
+      valor:
+        0,
+
       porcentaje:
         0
+
     };
 
   }
 
 
-  const ventana =
+  const recientes =
     precios.slice(
-      -Math.min(
-        30,
-        precios.length
-      )
+      -cantidad
     );
 
 
   const promedio =
     calcularPromedio(
-      ventana
+      recientes
     );
 
 
   const desviacion =
     calcularDesviacion(
-      ventana
+      recientes
     );
 
 
-  if (
-    promedio === 0
-  ) {
-
-    return {
-      nivel:
-        "Baja",
-
-      porcentaje:
-        0
-    };
-
-  }
-
-
   const porcentaje =
-    (
-      desviacion /
-      promedio
-    ) * 100;
+    promedio !== 0
+      ? (
+          desviacion /
+          promedio
+        ) *
+        100
+      : 0;
 
 
   let nivel =
@@ -1613,16 +2455,14 @@ function calcularVolatilidad(
 
 
   if (
-    porcentaje >
-    0.08
+    porcentaje >= 0.08
   ) {
 
     nivel =
       "Alta";
 
   } else if (
-    porcentaje >
-    0.025
+    porcentaje >= 0.025
   ) {
 
     nivel =
@@ -1632,8 +2472,14 @@ function calcularVolatilidad(
 
 
   return {
+
     nivel,
+
+    valor:
+      desviacion,
+
     porcentaje
+
   };
 
 }
@@ -1642,7 +2488,7 @@ function calcularVolatilidad(
 
 /*
 =========================================================
-22. CALCULAR TODOS LOS INDICADORES
+34. CALCULAR INDICADORES
 =========================================================
 */
 
@@ -1654,12 +2500,17 @@ function calcularIndicadores() {
 
 
   if (
+    !Array.isArray(precios) ||
     precios.length < 5
   ) {
 
     return null;
 
   }
+
+
+  const configuracion =
+    obtenerConfiguracionModo();
 
 
   const tendencia =
@@ -1670,7 +2521,9 @@ function calcularIndicadores() {
 
   const rsi =
     calcularRSI(
-      precios
+      precios,
+      configuracion
+        .periodoRSI
     );
 
 
@@ -1687,10 +2540,15 @@ function calcularIndicadores() {
 
 
   return {
+
     tendencia,
+
     rsi,
+
     momentum,
+
     volatilidad
+
   };
 
 }
@@ -1699,7 +2557,7 @@ function calcularIndicadores() {
 
 /*
 =========================================================
-23. MOSTRAR TENDENCIA
+35. MOSTRAR TENDENCIA
 =========================================================
 */
 
@@ -1733,6 +2591,7 @@ function mostrarTendencia(
 
     interfaz.detalleTendencia
       .textContent =
+        "Cambio: " +
         tendencia.cambio
           .toFixed(4) +
         "%";
@@ -1745,7 +2604,7 @@ function mostrarTendencia(
 
 /*
 =========================================================
-24. MOSTRAR RSI
+36. MOSTRAR RSI
 =========================================================
 */
 
@@ -1759,9 +2618,9 @@ function mostrarRSI(
 
     interfaz.rsi
       .textContent =
-        rsi === null
-          ? "--"
-          : rsi.toFixed(1);
+        Number.isFinite(rsi)
+          ? rsi.toFixed(1)
+          : "--";
 
   }
 
@@ -1776,12 +2635,12 @@ function mostrarRSI(
 
 
   if (
-    rsi === null
+    !Number.isFinite(rsi)
   ) {
 
     interfaz.detalleRsi
       .textContent =
-        "Requiere 15 ticks";
+        "Esperando más datos";
 
     return;
 
@@ -1796,12 +2655,7 @@ function mostrarRSI(
       .textContent =
         "Zona alta";
 
-    return;
-
-  }
-
-
-  if (
+  } else if (
     rsi < 30
   ) {
 
@@ -1809,14 +2663,13 @@ function mostrarRSI(
       .textContent =
         "Zona baja";
 
-    return;
+  } else {
+
+    interfaz.detalleRsi
+      .textContent =
+        "Zona neutral";
 
   }
-
-
-  interfaz.detalleRsi
-    .textContent =
-      "Zona neutral";
 
 }
 
@@ -1824,7 +2677,7 @@ function mostrarRSI(
 
 /*
 =========================================================
-25. MOSTRAR MOMENTUM
+37. MOSTRAR MOMENTUM
 =========================================================
 */
 
@@ -1859,7 +2712,11 @@ function mostrarMomentum(
     interfaz.detalleMomentum
       .textContent =
         momentum.valor
-          .toFixed(5);
+          .toFixed(5) +
+        " · " +
+        momentum.porcentaje
+          .toFixed(4) +
+        "%";
 
   }
 
@@ -1869,7 +2726,7 @@ function mostrarMomentum(
 
 /*
 =========================================================
-26. MOSTRAR VOLATILIDAD
+38. MOSTRAR VOLATILIDAD
 =========================================================
 */
 
@@ -1893,7 +2750,7 @@ function mostrarVolatilidad(
     interfaz.volatilidad
       .textContent =
         volatilidad.porcentaje
-          .toFixed(3) +
+          .toFixed(4) +
         "%";
 
   }
@@ -1905,6 +2762,7 @@ function mostrarVolatilidad(
 
     interfaz.detalleVolatilidad
       .textContent =
+        "Nivel " +
         volatilidad.nivel;
 
   }
@@ -1915,7 +2773,7 @@ function mostrarVolatilidad(
 
 /*
 =========================================================
-27. ACTUALIZAR INDICADORES
+39. ACTUALIZAR INDICADORES
 =========================================================
 */
 
@@ -1925,6 +2783,11 @@ function actualizarIndicadores() {
     calcularIndicadores();
 
 
+  estadoAplicacion
+    .indicadoresActuales =
+      indicadores;
+
+
   if (
     !indicadores
   ) {
@@ -1932,11 +2795,6 @@ function actualizarIndicadores() {
     return;
 
   }
-
-
-  estadoAplicacion
-    .indicadoresActuales =
-      indicadores;
 
 
   mostrarTendencia(
@@ -1964,7 +2822,7 @@ function actualizarIndicadores() {
 
 /*
 =========================================================
-28. FORMATEAR PRECIO
+40. FORMATEAR PRECIO
 =========================================================
 */
 
@@ -1982,20 +2840,17 @@ function formatearPrecio(
   }
 
 
-  if (
-    Number.isFinite(pipSize) &&
+  const decimales =
+    Number.isInteger(pipSize) &&
     pipSize >= 0 &&
-    pipSize <= 8
-  ) {
-
-    return precio.toFixed(
-      pipSize
-    );
-
-  }
+    pipSize <= 10
+      ? pipSize
+      : 2;
 
 
-  return String(precio);
+  return precio.toFixed(
+    decimales
+  );
 
 }
 
@@ -2003,7 +2858,7 @@ function formatearPrecio(
 
 /*
 =========================================================
-29. OBTENER ÚLTIMO DÍGITO
+41. OBTENER ÚLTIMO DÍGITO
 =========================================================
 */
 
@@ -2011,27 +2866,38 @@ function obtenerUltimoDigito(
   precioFormateado
 ) {
 
-  const digitos =
+  const texto =
     String(
-      precioFormateado
-    ).replace(
-      /\D/g,
-      ""
+      precioFormateado || ""
     );
 
 
-  if (
-    digitos.length === 0
+  for (
+    let indice =
+      texto.length - 1;
+    indice >= 0;
+    indice--
   ) {
 
-    return "--";
+    const caracter =
+      texto.charAt(indice);
+
+
+    if (
+      caracter >= "0" &&
+      caracter <= "9"
+    ) {
+
+      return Number(
+        caracter
+      );
+
+    }
 
   }
 
 
-  return digitos[
-    digitos.length - 1
-  ];
+  return null;
 
 }
 
@@ -2039,78 +2905,22 @@ function obtenerUltimoDigito(
 
 /*
 =========================================================
-30. MOSTRAR MOVIMIENTO DEL PRECIO
-=========================================================
-*/
-
-function mostrarMovimientoPrecio(
-  precio
-) {
-
-  if (
-    !interfaz.precioActual
-  ) {
-
-    return;
-
-  }
-
-
-  interfaz.precioActual
-    .className =
-      "precio-actual";
-
-
-  if (
-    estadoAplicacion
-      .precioAnterior === null
-  ) {
-
-    return;
-
-  }
-
-
-  if (
-    precio >
-    estadoAplicacion
-      .precioAnterior
-  ) {
-
-    interfaz.precioActual
-      .classList.add(
-        "sube"
-      );
-
-  }
-
-
-  if (
-    precio <
-    estadoAplicacion
-      .precioAnterior
-  ) {
-
-    interfaz.precioActual
-      .classList.add(
-        "baja"
-      );
-
-  }
-
-}
-
-
-
-/*
-=========================================================
-31. GUARDAR NUEVO PRECIO
+42. GUARDAR PRECIO
 =========================================================
 */
 
 function guardarPrecio(
   precio
 ) {
+
+  if (
+    !Number.isFinite(precio)
+  ) {
+
+    return;
+
+  }
+
 
   estadoAplicacion
     .precios.push(
@@ -2136,11 +2946,118 @@ function guardarPrecio(
 
 /*
 =========================================================
-32. PROCESAR TICK RECIBIDO
+43. GUARDAR ÚLTIMO DÍGITO
 =========================================================
 */
 
-function procesarTick(
+function guardarUltimoDigito(
+  digito
+) {
+
+  if (
+    !Number.isInteger(digito) ||
+    digito < 0 ||
+    digito > 9
+  ) {
+
+    return;
+
+  }
+
+
+  estadoAplicacion
+    .ultimosDigitos.push(
+      digito
+    );
+
+
+  if (
+    estadoAplicacion
+      .ultimosDigitos.length >
+    CONFIGURACION
+      .maximoDigitosGuardados
+  ) {
+
+    estadoAplicacion
+      .ultimosDigitos.shift();
+
+  }
+
+}
+
+
+
+/*
+=========================================================
+44. MOSTRAR MOVIMIENTO DEL PRECIO
+=========================================================
+*/
+
+function mostrarMovimientoPrecio(
+  precio
+) {
+
+  if (
+    !interfaz.precioActual
+  ) {
+
+    return;
+
+  }
+
+
+  interfaz.precioActual
+    .classList.remove(
+      "sube",
+      "baja"
+    );
+
+
+  const anterior =
+    estadoAplicacion
+      .precioAnterior;
+
+
+  if (
+    !Number.isFinite(anterior)
+  ) {
+
+    return;
+
+  }
+
+
+  if (
+    precio > anterior
+  ) {
+
+    interfaz.precioActual
+      .classList.add(
+        "sube"
+      );
+
+  } else if (
+    precio < anterior
+  ) {
+
+    interfaz.precioActual
+      .classList.add(
+        "baja"
+      );
+
+  }
+
+}
+
+
+
+/*
+=========================================================
+45. VALIDAR TICK RECIBIDO
+=========================================================
+*/
+
+function validarTick(
   datosTick
 ) {
 
@@ -2151,10 +3068,56 @@ function procesarTick(
     )
   ) {
 
+    return false;
+
+  }
+
+
+  const simboloRecibido =
+    String(
+      datosTick.simbolo || ""
+    ).trim();
+
+
+  if (
+    simboloRecibido &&
+    simboloRecibido !==
+      estadoAplicacion
+        .simboloActual
+  ) {
+
     registrarActividad(
-      "Se recibió un precio inválido.",
+      "Se ignoró un tick perteneciente al mercado anterior.",
       "advertencia"
     );
+
+
+    return false;
+
+  }
+
+
+  return true;
+
+}
+
+
+
+/*
+=========================================================
+46. PROCESAR TICK RECIBIDO
+=========================================================
+*/
+
+function procesarTick(
+  datosTick
+) {
+
+  if (
+    !validarTick(
+      datosTick
+    )
+  ) {
 
     return;
 
@@ -2162,7 +3125,9 @@ function procesarTick(
 
 
   const precio =
-    datosTick.precio;
+    Number(
+      datosTick.precio
+    );
 
 
   const precioFormateado =
@@ -2172,12 +3137,23 @@ function procesarTick(
     );
 
 
+  const ultimoDigito =
+    obtenerUltimoDigito(
+      precioFormateado
+    );
+
+
   estadoAplicacion
     .ticksRecibidos++;
 
 
   guardarPrecio(
     precio
+  );
+
+
+  guardarUltimoDigito(
+    ultimoDigito
   );
 
 
@@ -2217,9 +3193,13 @@ function procesarTick(
 
     interfaz.ultimoDigito
       .textContent =
-        obtenerUltimoDigito(
-          precioFormateado
-        );
+        Number.isInteger(
+          ultimoDigito
+        )
+          ? String(
+              ultimoDigito
+            )
+          : "--";
 
   }
 
@@ -2260,22 +3240,31 @@ function procesarTick(
 
   estadoAplicacion
     .ultimoEpoch =
-      datosTick.epoch;
+      Number.isFinite(
+        datosTick.epoch
+      )
+        ? datosTick.epoch
+        : null;
 
 
   estadoAplicacion
     .ultimoPipSize =
-      datosTick.pipSize;
+      Number.isInteger(
+        datosTick.pipSize
+      )
+        ? datosTick.pipSize
+        : null;
 
 
-    actualizarIndicadores();
+  estadoAplicacion
+    .ultimoPrecioFormateado =
+      precioFormateado;
+
+
+  actualizarIndicadores();
 
 
   actualizarProgresoDatos();
-
-
-  ejecutarAnalisisAutomatico();
-
 
 }
 
@@ -2283,20 +3272,35 @@ function procesarTick(
 
 /*
 =========================================================
-33. CAMBIAR DE MERCADO
+47. CAMBIAR MERCADO
 =========================================================
 */
 
 function cambiarMercado() {
 
-  actualizarNombreMercado();
+  const mercadoAnterior =
+    estadoAplicacion
+      .nombreMercadoActual;
 
 
-  limpiarDatosMercado();
+  sincronizarSeleccionActual();
+
+
+  limpiarDatosMercado(
+    "Esperando datos del nuevo mercado"
+  );
 
 
   registrarActividad(
     "Mercado seleccionado: " +
+    estadoAplicacion
+      .nombreMercadoActual +
+    "."
+  );
+
+
+  hablarMensaje(
+    "Mercado cambiado a " +
     estadoAplicacion
       .nombreMercadoActual +
     "."
@@ -2314,34 +3318,138 @@ function cambiarMercado() {
 
   }
 
+
+  if (
+    mercadoAnterior &&
+    mercadoAnterior ===
+      estadoAplicacion
+        .nombreMercadoActual
+  ) {
+
+    registrarActividad(
+      "El mercado seleccionado no cambió."
+    );
+
+  }
+
 }
 
 
 
 /*
 =========================================================
-34. CAMBIAR MODO DE ANÁLISIS
+48. CAMBIAR ESTRATEGIA
+=========================================================
+*/
+
+function cambiarEstrategia() {
+
+  sincronizarSeleccionActual();
+
+
+  detenerCuentaRegresiva();
+
+  detenerVoz();
+
+
+  estadoAplicacion
+    .versionAnalisis++;
+
+
+  estadoAplicacion
+    .ultimoAnalisisEpoch =
+      0;
+
+
+  estadoAplicacion
+    .claveUltimoAnalisis =
+      "";
+
+
+  reiniciarPanelSenal(
+    "La estrategia cambió. Ejecuta un nuevo análisis."
+  );
+
+
+  actualizarProgresoDatos();
+
+
+  registrarActividad(
+    "Estrategia seleccionada: " +
+    estadoAplicacion
+      .nombreEstrategiaActual +
+    "."
+  );
+
+
+  hablarMensaje(
+    "Estrategia seleccionada: " +
+    estadoAplicacion
+      .nombreEstrategiaActual +
+    "."
+  );
+
+}
+
+
+
+/*
+=========================================================
+49. CAMBIAR MODO DE ANÁLISIS
 =========================================================
 */
 
 function cambiarModoAnalisis() {
 
+  sincronizarSeleccionActual();
+
+
+  detenerCuentaRegresiva();
+
+  detenerVoz();
+
+
+  estadoAplicacion
+    .versionAnalisis++;
+
+
+  estadoAplicacion
+    .ultimoAnalisisEpoch =
+      0;
+
+
+  estadoAplicacion
+    .claveUltimoAnalisis =
+      "";
+
+
+  reiniciarPanelSenal(
+    "El modo cambió. Ejecuta un nuevo análisis."
+  );
+
+
+  actualizarIndicadores();
+
+
   actualizarProgresoDatos();
 
 
-  const modo =
+  const textoModo =
     interfaz.selectorModo
       ? interfaz.selectorModo
           .options[
             interfaz.selectorModo
               .selectedIndex
-          ].text
-      : "Modo desconocido";
+          ]
+          .textContent
+          .trim()
+      : estadoAplicacion
+          .modoActual;
 
 
   registrarActividad(
     "Modo seleccionado: " +
-    modo +
+    textoModo +
     "."
   );
 
@@ -2356,18 +3464,20 @@ FIN DE LA PARTE 2 DE 4
 NO BORRES ESTA LÍNEA.
 LA PARTE 3 DEBE PEGARSE INMEDIATAMENTE DEBAJO.
 =========================================================
-*/
+*/8
 
 /*
 =========================================================
-TRADING ANALYZER V5
+TRADING ANALYZER V6
 Archivo: app.js
 
 PARTE 3 DE 4
-- Motor de análisis
-- Cálculo de confianza
-- Señal SUBE, BAJA o ESPERAR
-- Razones técnicas
+- Motor de predicción
+- Rise/Fall
+- Par/Impar
+- Más/Menos
+- Match
+- Confianza técnica
 - Historial de resultados
 =========================================================
 */
@@ -2406,7 +3516,31 @@ function obtenerTextoModoActual() {
 
 /*
 =========================================================
-36. OBTENER TEXTO DE LA OPERACIÓN ACTUAL
+36. OBTENER VALOR DE LA OPERACIÓN ACTUAL
+=========================================================
+*/
+
+function obtenerOperacionActual() {
+
+  if (
+    !interfaz.selectorOperacion
+  ) {
+
+    return "rise_fall";
+
+  }
+
+
+  return interfaz.selectorOperacion.value ||
+    "rise_fall";
+
+}
+
+
+
+/*
+=========================================================
+37. OBTENER TEXTO DE LA OPERACIÓN ACTUAL
 =========================================================
 */
 
@@ -2416,7 +3550,7 @@ function obtenerTextoOperacionActual() {
     !interfaz.selectorOperacion
   ) {
 
-    return "Operación desconocida";
+    return "Rise/Fall";
 
   }
 
@@ -2429,7 +3563,7 @@ function obtenerTextoOperacionActual() {
 
   return opcionSeleccionada
     ? opcionSeleccionada.text
-    : "Operación desconocida";
+    : "Rise/Fall";
 
 }
 
@@ -2437,24 +3571,14 @@ function obtenerTextoOperacionActual() {
 
 /*
 =========================================================
-37. OBTENER VIGENCIA ESTIMADA
+38. OBTENER VIGENCIA ESTIMADA
 =========================================================
 */
 
 function obtenerVigenciaEstimada() {
 
-  if (
-    interfaz.selectorModo &&
-    interfaz.selectorModo.value ===
-      "completo"
-  ) {
-
-    return "aproximadamente 30 segundos";
-
-  }
-
-
-  return "aproximadamente 10 segundos";
+  return obtenerConfiguracionModo()
+    .vigencia;
 
 }
 
@@ -2462,7 +3586,7 @@ function obtenerVigenciaEstimada() {
 
 /*
 =========================================================
-38. LIMITAR UN NÚMERO
+39. LIMITAR UN NÚMERO
 =========================================================
 */
 
@@ -2486,7 +3610,100 @@ function limitarNumero(
 
 /*
 =========================================================
-39. EVALUAR TENDENCIA
+40. OBTENER ÚLTIMOS DÍGITOS GUARDADOS
+=========================================================
+*/
+
+function obtenerUltimosDigitos(
+  cantidad = 20
+) {
+
+  const precios =
+    estadoAplicacion
+      .precios.slice(
+        -cantidad
+      );
+
+
+  return precios
+    .map(
+      (precio) => {
+
+        const precioFormateado =
+          formatearPrecio(
+            precio,
+            estadoAplicacion
+              .ultimoPipSize
+          );
+
+
+        const ultimoDigito =
+          obtenerUltimoDigito(
+            precioFormateado
+          );
+
+
+        const numero =
+          Number(
+            ultimoDigito
+          );
+
+
+        return Number.isInteger(numero)
+          ? numero
+          : null;
+
+      }
+    )
+    .filter(
+      (digito) =>
+        digito !== null
+    );
+
+}
+
+
+
+/*
+=========================================================
+41. CONTAR REPETICIONES DE DÍGITOS
+=========================================================
+*/
+
+function contarDigitos(
+  digitos
+) {
+
+  const conteo =
+    Array(10).fill(0);
+
+
+  digitos.forEach(
+    (digito) => {
+
+      if (
+        Number.isInteger(digito) &&
+        digito >= 0 &&
+        digito <= 9
+      ) {
+
+        conteo[digito]++;
+
+      }
+
+    }
+  );
+
+
+  return conteo;
+
+}
+
+
+
+/*
+=========================================================
+42. EVALUAR TENDENCIA
 =========================================================
 */
 
@@ -2559,7 +3776,7 @@ function evaluarTendencia(
 
 /*
 =========================================================
-40. EVALUAR MOMENTUM
+43. EVALUAR MOMENTUM
 =========================================================
 */
 
@@ -2632,7 +3849,7 @@ function evaluarMomentum(
 
 /*
 =========================================================
-41. EVALUAR RSI
+44. EVALUAR RSI
 =========================================================
 */
 
@@ -2674,7 +3891,7 @@ function evaluarRSI(
 
 
     resultado.razones.push(
-      "El RSI acompaña el impulso alcista."
+      "El RSI acompaña el movimiento alcista."
     );
 
   } else if (
@@ -2686,12 +3903,15 @@ function evaluarRSI(
 
 
     resultado.razones.push(
-      "El RSI acompaña el impulso bajista."
+      "El RSI acompaña el movimiento bajista."
     );
 
   } else if (
     rsi > 72
   ) {
+
+    resultado.puntaje -= 1;
+
 
     resultado.advertencias.push(
       "El RSI está en una zona alta y podría existir agotamiento."
@@ -2700,6 +3920,9 @@ function evaluarRSI(
   } else if (
     rsi < 28
   ) {
+
+    resultado.puntaje += 1;
+
 
     resultado.advertencias.push(
       "El RSI está en una zona baja y podría existir rebote."
@@ -2722,7 +3945,7 @@ function evaluarRSI(
 
 /*
 =========================================================
-42. EVALUAR VOLATILIDAD
+45. EVALUAR VOLATILIDAD
 =========================================================
 */
 
@@ -2784,7 +4007,7 @@ function evaluarVolatilidad(
 
 
     resultado.advertencias.push(
-      "La volatilidad es alta y reduce la estabilidad de la señal."
+      "La volatilidad alta reduce la estabilidad de la predicción."
     );
 
   }
@@ -2798,7 +4021,7 @@ function evaluarVolatilidad(
 
 /*
 =========================================================
-43. COMBINAR RESULTADOS DE EVALUACIÓN
+46. COMBINAR EVALUACIONES
 =========================================================
 */
 
@@ -2821,6 +4044,15 @@ function combinarEvaluaciones(
 
   evaluaciones.forEach(
     (evaluacion) => {
+
+      if (
+        !evaluacion
+      ) {
+
+        return;
+
+      }
+
 
       if (
         Number.isFinite(
@@ -2883,95 +4115,39 @@ function combinarEvaluaciones(
 
 /*
 =========================================================
-44. DETERMINAR DIRECCIÓN
-=========================================================
-*/
-
-function determinarDireccion(
-  puntaje
-) {
-
-  if (
-    puntaje >= 3
-  ) {
-
-    return "SUBE";
-
-  }
-
-
-  if (
-    puntaje <= -3
-  ) {
-
-    return "BAJA";
-
-  }
-
-
-  return "ESPERAR";
-
-}
-
-
-
-/*
-=========================================================
-45. CALCULAR CONFIANZA
+47. CALCULAR CONFIANZA
 =========================================================
 */
 
 function calcularConfianza(
-  direccion,
-  puntaje,
-  ajusteConfianza
+  fuerza,
+  ajuste = 0
 ) {
 
-  let confianza;
+  const configuracion =
+    obtenerConfiguracionModo();
 
 
-  if (
-    direccion ===
-      "ESPERAR"
-  ) {
-
-    confianza =
-      43 +
-      Math.abs(
-        puntaje
-      ) * 5;
-
-  } else {
-
-    confianza =
-      58 +
-      Math.abs(
-        puntaje
-      ) * 8;
-
-  }
+  const base =
+    52;
 
 
-  confianza +=
-    ajusteConfianza;
-
-
-  if (
-    interfaz.selectorModo &&
-    interfaz.selectorModo.value ===
-      "rapido"
-  ) {
-
-    confianza -= 5;
-
-  }
+  const confianza =
+    base +
+    (
+      Math.abs(fuerza) *
+      7
+    ) +
+    ajuste +
+    configuracion
+      .ajusteConfianza;
 
 
   return Math.round(
     limitarNumero(
       confianza,
-      35,
-      92
+      45,
+      88
     )
   );
 
@@ -2981,193 +4157,32 @@ function calcularConfianza(
 
 /*
 =========================================================
-46. CREAR TÍTULO DEL RESULTADO
+48. CREAR RESULTADO BASE
 =========================================================
 */
 
-function crearTituloResultado(
-  direccion
+function crearResultadoBase(
+  direccion,
+  confianza,
+  razones,
+  advertencias
 ) {
 
-  if (
-    direccion === "SUBE"
-  ) {
-
-    return "Probabilidad de subida";
-
-  }
-
-
-  if (
-    direccion === "BAJA"
-  ) {
-
-    return "Probabilidad de bajada";
-
-  }
-
-
-  return "Sin ventaja técnica clara";
-
-}
-
-
-
-/*
-=========================================================
-47. VALIDAR TIPO DE OPERACIÓN
-=========================================================
-*/
-
-function validarTipoOperacion(
-  resultado
-) {
-
-  if (
-    !interfaz.selectorOperacion
-  ) {
-
-    return resultado;
-
-  }
-
-
-  const tipoOperacion =
-    interfaz.selectorOperacion.value;
-
-
-  if (
-    tipoOperacion ===
-      "rise_fall"
-  ) {
-
-    return resultado;
-
-  }
-
-
-  resultado.direccion =
-    "ESPERAR";
-
-
-  resultado.titulo =
-    "Análisis todavía no disponible";
-
-
-  resultado.confianza =
-    Math.min(
-      resultado.confianza,
-      55
-    );
-
-
-  resultado.advertencias.push(
-    "La primera versión del motor está optimizada para Rise/Fall."
-  );
-
-
-  resultado.advertencias.push(
-    "Par/Impar y Más/Menos se activarán en una etapa posterior."
-  );
-
-
-  return resultado;
-
-}
-
-
-
-/*
-=========================================================
-48. GENERAR RESULTADO TÉCNICO
-=========================================================
-*/
-
-function generarResultadoTecnico() {
-
-  const indicadores =
-    estadoAplicacion
-      .indicadoresActuales ||
-    calcularIndicadores();
-
-
-  if (
-    !indicadores
-  ) {
-
-    return null;
-
-  }
-
-
-  const evaluacionTendencia =
-    evaluarTendencia(
-      indicadores.tendencia
-    );
-
-
-  const evaluacionMomentum =
-    evaluarMomentum(
-      indicadores.momentum
-    );
-
-
-  const evaluacionRSI =
-    evaluarRSI(
-      indicadores.rsi
-    );
-
-
-  const evaluacionVolatilidad =
-    evaluarVolatilidad(
-      indicadores.volatilidad
-    );
-
-
-  const combinacion =
-    combinarEvaluaciones(
-      [
-        evaluacionTendencia,
-        evaluacionMomentum,
-        evaluacionRSI,
-        evaluacionVolatilidad
-      ]
-    );
-
-
-  const direccion =
-    determinarDireccion(
-      combinacion.puntaje
-    );
-
-
-  const confianza =
-    calcularConfianza(
-      direccion,
-      combinacion.puntaje,
-      combinacion.ajusteConfianza
-    );
-
-
-  let resultado = {
+  return {
 
     direccion,
 
     confianza,
 
     titulo:
-      crearTituloResultado(
-        direccion
-      ),
+      "Predicción: " +
+      direccion,
 
     razones:
-      combinacion.razones,
+      razones || [],
 
     advertencias:
-      combinacion.advertencias,
-
-    puntaje:
-      combinacion.puntaje,
+      advertencias || [],
 
     vigencia:
       obtenerVigenciaEstimada(),
@@ -3191,14 +4206,91 @@ function generarResultadoTecnico() {
 
   };
 
+}
 
-  resultado =
-    validarTipoOperacion(
-      resultado
+
+
+/*
+=========================================================
+49. GENERAR RESULTADO RISE/FALL
+=========================================================
+*/
+
+function generarResultadoRiseFall(
+  indicadores
+) {
+
+  const combinacion =
+    combinarEvaluaciones(
+      [
+        evaluarTendencia(
+          indicadores.tendencia
+        ),
+
+        evaluarMomentum(
+          indicadores.momentum
+        ),
+
+        evaluarRSI(
+          indicadores.rsi
+        ),
+
+        evaluarVolatilidad(
+          indicadores.volatilidad
+        )
+      ]
     );
 
 
-  return resultado;
+  let direccion =
+    "ESPERAR";
+
+
+  if (
+    combinacion.puntaje >= 2
+  ) {
+
+    direccion =
+      "SUBE";
+
+  }
+
+
+  if (
+    combinacion.puntaje <= -2
+  ) {
+
+    direccion =
+      "BAJA";
+
+  }
+
+
+  if (
+    direccion === "ESPERAR"
+  ) {
+
+    combinacion.advertencias.push(
+      "Los indicadores no presentan suficiente coincidencia."
+    );
+
+  }
+
+
+  const confianza =
+    calcularConfianza(
+      combinacion.puntaje,
+      combinacion
+        .ajusteConfianza
+    );
+
+
+  return crearResultadoBase(
+    direccion,
+    confianza,
+    combinacion.razones,
+    combinacion.advertencias
+  );
 
 }
 
@@ -3206,7 +4298,474 @@ function generarResultadoTecnico() {
 
 /*
 =========================================================
-49. LIMPIAR LISTA DE MOTIVOS
+50. GENERAR RESULTADO PAR/IMPAR
+=========================================================
+*/
+
+function generarResultadoParImpar() {
+
+  const digitos =
+    obtenerUltimosDigitos(
+      30
+    );
+
+
+  if (
+    digitos.length < 10
+  ) {
+
+    return crearResultadoBase(
+      "ESPERAR",
+      45,
+      [],
+      [
+        "Todavía no existen suficientes dígitos para analizar Par/Impar."
+      ]
+    );
+
+  }
+
+
+  const cantidadPares =
+    digitos.filter(
+      (digito) =>
+        digito % 2 === 0
+    ).length;
+
+
+  const cantidadImpares =
+    digitos.length -
+    cantidadPares;
+
+
+  const diferencia =
+    cantidadPares -
+    cantidadImpares;
+
+
+  let direccion =
+    "ESPERAR";
+
+
+  if (
+    diferencia >= 3
+  ) {
+
+    direccion =
+      "PAR";
+
+  }
+
+
+  if (
+    diferencia <= -3
+  ) {
+
+    direccion =
+      "IMPAR";
+
+  }
+
+
+  const porcentajePares =
+    (
+      cantidadPares /
+      digitos.length
+    ) * 100;
+
+
+  const porcentajeImpares =
+    100 -
+    porcentajePares;
+
+
+  const razones = [
+
+    "Dígitos pares observados: " +
+    cantidadPares +
+    " de " +
+    digitos.length +
+    ".",
+
+    "Dígitos impares observados: " +
+    cantidadImpares +
+    " de " +
+    digitos.length +
+    "."
+
+  ];
+
+
+  const advertencias = [];
+
+
+  if (
+    direccion === "ESPERAR"
+  ) {
+
+    advertencias.push(
+      "La distribución entre pares e impares está demasiado equilibrada."
+    );
+
+  }
+
+
+  const fuerza =
+    Math.abs(
+      porcentajePares -
+      porcentajeImpares
+    ) / 10;
+
+
+  const confianza =
+    calcularConfianza(
+      fuerza
+    );
+
+
+  return crearResultadoBase(
+    direccion,
+    confianza,
+    razones,
+    advertencias
+  );
+
+}
+
+
+
+/*
+=========================================================
+51. GENERAR RESULTADO MÁS/MENOS
+=========================================================
+*/
+
+function generarResultadoMasMenos() {
+
+  const digitos =
+    obtenerUltimosDigitos(
+      30
+    );
+
+
+  if (
+    digitos.length < 10
+  ) {
+
+    return crearResultadoBase(
+      "ESPERAR",
+      45,
+      [],
+      [
+        "Todavía no existen suficientes dígitos para analizar Más/Menos."
+      ]
+    );
+
+  }
+
+
+  const menores =
+    digitos.filter(
+      (digito) =>
+        digito <= 4
+    ).length;
+
+
+  const mayores =
+    digitos.filter(
+      (digito) =>
+        digito >= 5
+    ).length;
+
+
+  const diferencia =
+    mayores -
+    menores;
+
+
+  let direccion =
+    "ESPERAR";
+
+
+  if (
+    diferencia >= 3
+  ) {
+
+    direccion =
+      "MÁS";
+
+  }
+
+
+  if (
+    diferencia <= -3
+  ) {
+
+    direccion =
+      "MENOS";
+
+  }
+
+
+  const razones = [
+
+    "Dígitos del 0 al 4: " +
+    menores +
+    ".",
+
+    "Dígitos del 5 al 9: " +
+    mayores +
+    "."
+
+  ];
+
+
+  const advertencias = [];
+
+
+  if (
+    direccion === "ESPERAR"
+  ) {
+
+    advertencias.push(
+      "No existe una diferencia suficiente entre dígitos altos y bajos."
+    );
+
+  }
+
+
+  const fuerza =
+    Math.abs(
+      diferencia
+    ) / 3;
+
+
+  const confianza =
+    calcularConfianza(
+      fuerza
+    );
+
+
+  return crearResultadoBase(
+    direccion,
+    confianza,
+    razones,
+    advertencias
+  );
+
+}
+
+
+
+/*
+=========================================================
+52. GENERAR RESULTADO MATCH
+=========================================================
+*/
+
+function generarResultadoMatch() {
+
+  const digitos =
+    obtenerUltimosDigitos(
+      40
+    );
+
+
+  if (
+    digitos.length < 15
+  ) {
+
+    return crearResultadoBase(
+      "ESPERAR",
+      45,
+      [],
+      [
+        "Todavía no existen suficientes dígitos para analizar Match."
+      ]
+    );
+
+  }
+
+
+  const conteo =
+    contarDigitos(
+      digitos
+    );
+
+
+  let digitoFrecuente = 0;
+
+  let mayorFrecuencia =
+    conteo[0];
+
+
+  for (
+    let digito = 1;
+    digito <= 9;
+    digito++
+  ) {
+
+    if (
+      conteo[digito] >
+      mayorFrecuencia
+    ) {
+
+      mayorFrecuencia =
+        conteo[digito];
+
+
+      digitoFrecuente =
+        digito;
+
+    }
+
+  }
+
+
+  const porcentaje =
+    (
+      mayorFrecuencia /
+      digitos.length
+    ) * 100;
+
+
+  let direccion =
+    "ESPERAR";
+
+
+  const advertencias = [];
+
+
+  if (
+    mayorFrecuencia >= 4 &&
+    porcentaje >= 15
+  ) {
+
+    direccion =
+      "MATCH " +
+      digitoFrecuente;
+
+  } else {
+
+    advertencias.push(
+      "Ningún dígito muestra una frecuencia suficientemente destacada."
+    );
+
+  }
+
+
+  const razones = [
+
+    "El dígito más frecuente es " +
+    digitoFrecuente +
+    ".",
+
+    "Apareció " +
+    mayorFrecuencia +
+    " veces en los últimos " +
+    digitos.length +
+    " ticks.",
+
+    "Frecuencia observada: " +
+    porcentaje.toFixed(1) +
+    "%."
+
+  ];
+
+
+  const fuerza =
+    Math.max(
+      0,
+      porcentaje - 10
+    ) / 3;
+
+
+  const confianza =
+    calcularConfianza(
+      fuerza,
+      -5
+    );
+
+
+  return crearResultadoBase(
+    direccion,
+    confianza,
+    razones,
+    advertencias
+  );
+
+}
+
+
+
+/*
+=========================================================
+53. GENERAR RESULTADO SEGÚN LA OPERACIÓN
+=========================================================
+*/
+
+function generarResultadoTecnico() {
+
+  const indicadores =
+    estadoAplicacion
+      .indicadoresActuales ||
+    calcularIndicadores();
+
+
+  if (
+    !indicadores
+  ) {
+
+    return null;
+
+  }
+
+
+  const operacion =
+    obtenerOperacionActual();
+
+
+  if (
+    operacion === "par_impar" ||
+    operacion === "even_odd"
+  ) {
+
+    return generarResultadoParImpar();
+
+  }
+
+
+  if (
+    operacion === "mas_menos" ||
+    operacion === "over_under"
+  ) {
+
+    return generarResultadoMasMenos();
+
+  }
+
+
+  if (
+    operacion === "match" ||
+    operacion === "matches"
+  ) {
+
+    return generarResultadoMatch();
+
+  }
+
+
+  return generarResultadoRiseFall(
+    indicadores
+  );
+
+}
+
+
+
+/*
+=========================================================
+54. LIMPIAR LISTA DE MOTIVOS
 =========================================================
 */
 
@@ -3227,7 +4786,7 @@ function limpiarMotivosResultado() {
 
 /*
 =========================================================
-50. AGREGAR MOTIVO AL RESULTADO
+55. AGREGAR MOTIVO AL RESULTADO
 =========================================================
 */
 
@@ -3245,7 +4804,9 @@ function agregarMotivoResultado(
 
 
   const elemento =
-    document.createElement("li");
+    document.createElement(
+      "li"
+    );
 
 
   elemento.textContent =
@@ -3263,68 +4824,7 @@ function agregarMotivoResultado(
 
 /*
 =========================================================
-51. MOSTRAR CLASE VISUAL DEL RESULTADO
-=========================================================
-*/
-
-function mostrarClaseResultado(
-  direccion
-) {
-
-  if (
-    !interfaz.panelSenal
-  ) {
-
-    return;
-
-  }
-
-
-  interfaz.panelSenal
-    .className =
-      "panel-senal";
-
-
-  if (
-    direccion === "SUBE"
-  ) {
-
-    interfaz.panelSenal
-      .classList.add(
-        "sube"
-      );
-
-    return;
-
-  }
-
-
-  if (
-    direccion === "BAJA"
-  ) {
-
-    interfaz.panelSenal
-      .classList.add(
-        "baja"
-      );
-
-    return;
-
-  }
-
-
-  interfaz.panelSenal
-    .classList.add(
-      "esperar"
-    );
-
-}
-
-
-
-/*
-=========================================================
-52. MOSTRAR RESULTADO EN PANTALLA
+56. MOSTRAR RESULTADO
 =========================================================
 */
 
@@ -3332,23 +4832,60 @@ function mostrarResultado(
   resultado
 ) {
 
-  if (
-    !resultado
-  ) {
-
-    return;
-
-  }
-
-
   estadoAplicacion
     .ultimoResultado =
       resultado;
 
 
-  mostrarClaseResultado(
-    resultado.direccion
-  );
+  if (
+    interfaz.panelSenal
+  ) {
+
+    interfaz.panelSenal
+      .className =
+        "panel-senal";
+
+
+    if (
+      resultado.direccion ===
+        "SUBE" ||
+      resultado.direccion ===
+        "PAR" ||
+      resultado.direccion ===
+        "MÁS" ||
+      resultado.direccion
+        .startsWith("MATCH")
+    ) {
+
+      interfaz.panelSenal
+        .classList.add(
+          "sube"
+        );
+
+    } else if (
+      resultado.direccion ===
+        "BAJA" ||
+      resultado.direccion ===
+        "IMPAR" ||
+      resultado.direccion ===
+        "MENOS"
+    ) {
+
+      interfaz.panelSenal
+        .classList.add(
+          "baja"
+        );
+
+    } else {
+
+      interfaz.panelSenal
+        .classList.add(
+          "esperar"
+        );
+
+    }
+
+  }
 
 
   if (
@@ -3359,8 +4896,8 @@ function mostrarResultado(
       .textContent =
         resultado.direccion ===
           "ESPERAR"
-          ? "NO OPERAR"
-          : "SEÑAL TÉCNICA";
+          ? "Sin ventaja clara"
+          : "Predicción preparada";
 
   }
 
@@ -3430,7 +4967,7 @@ function mostrarResultado(
     (razon) => {
 
       agregarMotivoResultado(
-        "✔ " + razon
+        razon
       );
 
     }
@@ -3441,7 +4978,8 @@ function mostrarResultado(
     (advertencia) => {
 
       agregarMotivoResultado(
-        "⚠ " + advertencia
+        "⚠ " +
+        advertencia
       );
 
     }
@@ -3465,7 +5003,7 @@ function mostrarResultado(
 
 /*
 =========================================================
-53. CREAR ELEMENTO DEL HISTORIAL
+57. CREAR ELEMENTO DEL HISTORIAL
 =========================================================
 */
 
@@ -3530,7 +5068,7 @@ function crearElementoHistorial(
 
 /*
 =========================================================
-54. ACTUALIZAR HISTORIAL EN PANTALLA
+58. ACTUALIZAR HISTORIAL EN PANTALLA
 =========================================================
 */
 
@@ -3600,7 +5138,7 @@ function actualizarHistorialPantalla() {
 
 /*
 =========================================================
-55. AGREGAR RESULTADO AL HISTORIAL
+59. AGREGAR RESULTADO AL HISTORIAL
 =========================================================
 */
 
@@ -3641,7 +5179,7 @@ function agregarResultadoHistorial(
 
 /*
 =========================================================
-56. LIMPIAR HISTORIAL
+60. LIMPIAR HISTORIAL
 =========================================================
 */
 
@@ -3664,7 +5202,7 @@ function limpiarHistorial() {
 
 /*
 =========================================================
-57. EJECUTAR ANÁLISIS
+61. EJECUTAR ANÁLISIS
 =========================================================
 */
 
@@ -3699,11 +5237,23 @@ function ejecutarAnalisis() {
       "advertencia"
     );
 
+
     actualizarProgresoDatos();
+
 
     return;
 
   }
+
+
+  registrarActividad(
+    "Analizando " +
+    estadoAplicacion
+      .nombreMercadoActual +
+    " con la estrategia " +
+    obtenerTextoOperacionActual() +
+    "."
+  );
 
 
   actualizarIndicadores();
@@ -3738,169 +5288,20 @@ function ejecutarAnalisis() {
 
 
   registrarActividad(
-    "Análisis generado: " +
+    "Predicción generada: " +
     resultado.direccion +
     " con " +
     resultado.confianza +
     "% de confianza técnica.",
-    "exito"
-  );
-if (
-  resultado.direccion !== "ESPERAR" &&
-  resultado.confianza >=
-    CONFIGURACION.confianzaMinimaAlerta
-) {
-
-  iniciarAlertaAutomatica(
-    resultado
-  );
-
-}
-  
-}
-
-/*
-=========================================================
-57A. EJECUTAR ANÁLISIS AUTOMÁTICO
-=========================================================
-*/
-
-function ejecutarAnalisisAutomatico() {
-
-  if (
-    !estadoAplicacion
-      .analisisAutomaticoActivo ||
-    estadoAplicacion
-      .alertaActiva
-  ) {
-
-    return;
-
-  }
-
-
-  if (
-    !estadoAplicacion.conectado
-  ) {
-
-    return;
-
-  }
-
-
-  const minimo =
-    obtenerMinimoTicks();
-
-
-  if (
-    estadoAplicacion
-      .precios.length <
-    minimo
-  ) {
-
-    return;
-
-  }
-
-
-  const tiempoActual =
-    Date.now();
-
-
-  const tiempoDesdeUltimoAnalisis =
-    tiempoActual -
-    estadoAplicacion
-      .ultimoAnalisisAutomaticoTiempo;
-
-
-  if (
-    tiempoDesdeUltimoAnalisis <
-    CONFIGURACION
-      .intervaloAnalisisAutomatico
-  ) {
-
-    return;
-
-  }
-
-
-  estadoAplicacion
-    .ultimoAnalisisAutomaticoTiempo =
-      tiempoActual;
-
-
-  actualizarIndicadores();
-
-
-  const resultado =
-    generarResultadoTecnico();
-
-
-  if (
-    !resultado ||
     resultado.direccion ===
-      "ESPERAR" ||
-    resultado.confianza <
-      CONFIGURACION
-        .confianzaMinimaAlerta
-  ) {
-
-    return;
-
-  }
-
-
-  const tiempoDesdeUltimaAlerta =
-    tiempoActual -
-    estadoAplicacion
-      .ultimaAlertaTiempo;
-
-
-  if (
-    resultado.direccion ===
-      estadoAplicacion
-        .ultimaDireccionAlertada &&
-    tiempoDesdeUltimaAlerta <
-      CONFIGURACION
-        .tiempoEntreAlertas
-  ) {
-
-    return;
-
-  }
-
-
-  estadoAplicacion
-    .ultimaDireccionAlertada =
-      resultado.direccion;
-
-
-  estadoAplicacion
-    .ultimaAlertaTiempo =
-      tiempoActual;
-
-
-  mostrarResultado(
-    resultado
+      "ESPERAR"
+      ? "advertencia"
+      : "exito"
   );
-
-
-  agregarResultadoHistorial(
-    resultado
-  );
-
-
-  registrarActividad(
-    "Señal automática detectada: " +
-    resultado.direccion +
-    " con " +
-    resultado.confianza +
-    "% de confianza técnica.",
-    "exito"
-);
-  iniciarAlertaAutomatica(resultado);
 
 }
+
+
 
 /*
 =========================================================
@@ -3909,17 +5310,18 @@ FIN DE LA PARTE 3 DE 4
 NO BORRES ESTA LÍNEA.
 LA PARTE 4 DEBE PEGARSE INMEDIATAMENTE DEBAJO.
 =========================================================
-*/
+*/   
 
 /*
 =========================================================
-TRADING ANALYZER V5
+TRADING ANALYZER V6
 Archivo: app.js
 
 PARTE 4 DE 4
 - Eventos de la interfaz
 - Eventos de Deriv
-- Lectura por voz
+- Asistente de voz
+- Cuenta regresiva
 - Limpieza del registro
 - Inicio general de la aplicación
 =========================================================
@@ -3928,11 +5330,370 @@ PARTE 4 DE 4
 
 /*
 =========================================================
-58. LEER RESULTADO POR VOZ
+62. TEMPORIZADOR DE VIGENCIA
 =========================================================
 */
 
-function leerResultadoPorVoz() {
+let temporizadorVigencia = null;
+
+
+
+/*
+=========================================================
+63. OBTENER SEGUNDOS DE VIGENCIA
+=========================================================
+*/
+
+function obtenerSegundosVigencia(
+  resultado = null
+) {
+
+  const valor =
+    resultado &&
+    resultado.vigencia !== undefined
+      ? resultado.vigencia
+      : obtenerVigenciaEstimada();
+
+
+  if (
+    Number.isFinite(
+      Number(valor)
+    )
+  ) {
+
+    return Math.max(
+      1,
+      Math.round(
+        Number(valor)
+      )
+    );
+
+  }
+
+
+  const texto =
+    String(
+      valor || ""
+    );
+
+
+  const coincidencia =
+    texto.match(
+      /\d+/
+    );
+
+
+  if (
+    coincidencia
+  ) {
+
+    return Math.max(
+      1,
+      Number(
+        coincidencia[0]
+      )
+    );
+
+  }
+
+
+  if (
+    interfaz.selectorModo &&
+    interfaz.selectorModo.value ===
+      "completo"
+  ) {
+
+    return 30;
+
+  }
+
+
+  return 10;
+
+}
+
+
+
+/*
+=========================================================
+64. DETENER CUENTA REGRESIVA
+=========================================================
+*/
+
+function detenerCuentaRegresiva() {
+
+  if (
+    temporizadorVigencia
+  ) {
+
+    clearInterval(
+      temporizadorVigencia
+    );
+
+
+    temporizadorVigencia =
+      null;
+
+  }
+
+}
+
+
+
+/*
+=========================================================
+65. ACTUALIZAR TEXTO DE VIGENCIA
+=========================================================
+*/
+
+function actualizarTextoVigencia(
+  segundos
+) {
+
+  if (
+    !interfaz.vigenciaSenal
+  ) {
+
+    return;
+
+  }
+
+
+  if (
+    segundos <= 0
+  ) {
+
+    interfaz.vigenciaSenal
+      .textContent =
+        "Señal finalizada";
+
+    return;
+
+  }
+
+
+  interfaz.vigenciaSenal
+    .textContent =
+      "Vigencia: " +
+      segundos +
+      (
+        segundos === 1
+          ? " segundo"
+          : " segundos"
+      );
+
+}
+
+
+
+/*
+=========================================================
+66. INICIAR CUENTA REGRESIVA
+=========================================================
+*/
+
+function iniciarCuentaRegresiva(
+  resultado
+) {
+
+  detenerCuentaRegresiva();
+
+
+  if (
+    !resultado ||
+    resultado.direccion ===
+      "ESPERAR"
+  ) {
+
+    if (
+      interfaz.vigenciaSenal
+    ) {
+
+      interfaz.vigenciaSenal
+        .textContent =
+          "Sin cuenta regresiva";
+
+    }
+
+
+    return;
+
+  }
+
+
+  let segundos =
+    obtenerSegundosVigencia(
+      resultado
+    );
+
+
+  actualizarTextoVigencia(
+    segundos
+  );
+
+
+  temporizadorVigencia =
+    setInterval(
+      () => {
+
+        segundos--;
+
+
+        actualizarTextoVigencia(
+          segundos
+        );
+
+
+        if (
+          estadoAplicacion
+            .vozActiva &&
+          (
+            segundos === 5 ||
+            segundos === 3 ||
+            segundos === 2 ||
+            segundos === 1
+          )
+        ) {
+
+          hablarMensaje(
+            "Quedan " +
+            segundos +
+            (
+              segundos === 1
+                ? " segundo."
+                : " segundos."
+            )
+          );
+
+        }
+
+
+        if (
+          segundos <= 0
+        ) {
+
+          detenerCuentaRegresiva();
+
+
+          registrarActividad(
+            "La vigencia de la señal ha finalizado.",
+            "advertencia"
+          );
+
+
+          if (
+            estadoAplicacion
+              .vozActiva
+          ) {
+
+            hablarMensaje(
+              "Señal finalizada."
+            );
+
+          }
+
+
+          if (
+            interfaz.prediccionEstado
+          ) {
+
+            interfaz.prediccionEstado
+              .textContent =
+                "SEÑAL FINALIZADA";
+
+          }
+
+        }
+
+      },
+      1000
+    );
+
+}
+
+
+
+/*
+=========================================================
+67. ANUNCIAR RESULTADO POR VOZ
+=========================================================
+*/
+
+function anunciarResultadoPorVoz(
+  resultado
+) {
+
+  if (
+    !resultado ||
+    !estadoAplicacion
+      .vozActiva
+  ) {
+
+    return;
+
+  }
+
+
+  if (
+    resultado.direccion ===
+      "ESPERAR"
+  ) {
+
+    hablarMensaje(
+      "No existe una ventaja clara. Se recomienda esperar."
+    );
+
+    return;
+
+  }
+
+
+  const segundos =
+    obtenerSegundosVigencia(
+      resultado
+    );
+
+
+  const texto =
+    "Predicción " +
+    resultado.direccion +
+    ". Confianza técnica " +
+    resultado.confianza +
+    " por ciento. Quedan " +
+    segundos +
+    " segundos para utilizar la señal.";
+
+
+  hablarMensaje(
+    texto
+  );
+
+}
+
+
+
+/*
+=========================================================
+68. EJECUTAR ANÁLISIS COMPLETO
+=========================================================
+*/
+
+function ejecutarAnalisisCompleto() {
+
+  if (
+    estadoAplicacion
+      .vozActiva
+  ) {
+
+    hablarMensaje(
+      "Analizando mercado."
+    );
+
+  }
+
+
+  ejecutarAnalisis();
+
 
   const resultado =
     estadoAplicacion
@@ -3943,121 +5704,18 @@ function leerResultadoPorVoz() {
     !resultado
   ) {
 
-    registrarActividad(
-      "Todavía no existe un resultado para leer.",
-      "advertencia"
-    );
-
     return;
 
   }
 
 
-  if (
-    !(
-      "speechSynthesis" in window
-    )
-  ) {
-
-    registrarActividad(
-      "Este navegador no permite lectura por voz.",
-      "advertencia"
-    );
-
-    return;
-
-  }
-
-
-  window.speechSynthesis.cancel();
-
-
-  const texto =
-    resultado.titulo +
-    ". Dirección probable: " +
-    resultado.direccion +
-    ". Confianza técnica: " +
-    resultado.confianza +
-    " por ciento. " +
-    "Vigencia estimada: " +
-    resultado.vigencia +
-    ".";
-
-
-  const mensaje =
-    new SpeechSynthesisUtterance(
-      texto
-    );
-
-
-  mensaje.lang =
-    CONFIGURACION.idiomaVoz;
-
-
-  mensaje.rate =
-    CONFIGURACION.velocidadVoz;
-
-
-  mensaje.pitch = 1;
-
-
-  mensaje.volume = 1;
-
-
-  window.speechSynthesis.speak(
-    mensaje
+  anunciarResultadoPorVoz(
+    resultado
   );
 
 
-  registrarActividad(
-    "Leyendo el resultado por voz."
-   );
-
-} 
-
-  /*
-=========================================================
-57B. HABLAR MENSAJE AUTOMÁTICO
-=========================================================
-*/
-
-function hablarMensajeAutomatica(
-  texto
-) {
-
-  if (
-    !estadoAplicacion.vozActiva ||
-    !(
-      "speechSynthesis" in window
-    )
-  ) {
-
-    return;
-
-  }
-
-
-  const mensaje =
-    new SpeechSynthesisUtterance(
-      texto
-    );
-
-
-  mensaje.lang =
-    CONFIGURACION.idiomaVoz;
-
-
-  mensaje.rate =
-    CONFIGURACION.velocidadVoz;
-
-
-  mensaje.pitch = 1;
-
-  mensaje.volume = 1;
-
-
-  window.speechSynthesis.speak(
-    mensaje
+  iniciarCuentaRegresiva(
+    resultado
   );
 
 }
@@ -4066,147 +5724,7 @@ function hablarMensajeAutomatica(
 
 /*
 =========================================================
-57C. INICIAR ALERTA AUTOMÁTICA
-=========================================================
-*/
-
-function iniciarAlertaAutomatica(
-  resultado
-) {
-
-  if (
-    !resultado ||
-    estadoAplicacion.alertaActiva
-  ) {
-
-    return;
-
-  }
-
-
-  estadoAplicacion.alertaActiva =
-    true;
-
-
-  let segundosRestantes =
-    CONFIGURACION
-      .duracionCuentaRegresiva;
-
-
-  const direccionVoz =
-    resultado.direccion === "SUBE"
-      ? "subida"
-      : "bajada";
-
-
-  if (
-    "speechSynthesis" in window
-  ) {
-
-    window.speechSynthesis.cancel();
-
-  }
-
-
-  hablarMensajeAutomatico(
-    "Atención. Señal de " +
-    direccionVoz +
-    " detectada. Tienes diez segundos para realizar la operación."
-  );
-
-
-  if (
-    interfaz.vigenciaSenal
-  ) {
-
-    interfaz.vigenciaSenal
-      .textContent =
-        "Tiempo para entrar: " +
-        segundosRestantes +
-        " segundos";
-
-  }
-
-
-  clearInterval(
-    estadoAplicacion
-      .temporizadorCuentaRegresiva
-  );
-
-
-  estadoAplicacion
-    .temporizadorCuentaRegresiva =
-      setInterval(
-        () => {
-
-          segundosRestantes--;
-
-
-          if (
-            interfaz.vigenciaSenal
-          ) {
-
-            interfaz.vigenciaSenal
-              .textContent =
-                segundosRestantes > 0
-                  ? "Tiempo para entrar: " +
-                    segundosRestantes +
-                    " segundos"
-                  : "Tiempo de entrada terminado";
-
-          }
-
-
-          if (
-            segundosRestantes > 0
-          ) {
-
-            hablarMensajeAutomatico(
-              String(
-                segundosRestantes
-              )
-            );
-
-            return;
-
-          }
-
-
-          clearInterval(
-            estadoAplicacion
-              .temporizadorCuentaRegresiva
-          );
-
-
-          estadoAplicacion
-            .temporizadorCuentaRegresiva =
-              null;
-
-
-          estadoAplicacion.alertaActiva =
-            false;
-
-
-          hablarMensajeAutomatico(
-            "Cero. Tiempo terminado."
-          );
-
-
-          registrarActividad(
-            "La ventana de entrada automática terminó."
-          );
-
-        },
-        1000
-      );
-
-}
-
-
-
-/*
-=========================================================
-59. LIMPIAR REGISTRO DE ACTIVIDAD
+69. LIMPIAR REGISTRO DE ACTIVIDAD
 =========================================================
 */
 
@@ -4235,32 +5753,59 @@ function limpiarRegistroActividad() {
 
 /*
 =========================================================
-60. CAMBIAR TIPO DE OPERACIÓN
+70. MANEJAR CAMBIO DE MERCADO
 =========================================================
 */
 
-function cambiarTipoOperacion() {
+function manejarCambioMercado() {
 
-  const operacion =
-    obtenerTextoOperacionActual();
+  detenerCuentaRegresiva();
+
+
+  actualizarNombreMercado();
+
+
+  limpiarDatosMercado();
+
+
+  prepararResultadoInicial();
 
 
   registrarActividad(
-    "Tipo de operación seleccionado: " +
-    operacion +
+    "Mercado seleccionado: " +
+    estadoAplicacion
+      .nombreMercadoActual +
     "."
   );
 
 
   if (
-    interfaz.selectorOperacion &&
-    interfaz.selectorOperacion.value !==
-      "rise_fall"
+    estadoAplicacion
+      .vozActiva
   ) {
 
+    hablarMensaje(
+      "Mercado cambiado a " +
+      estadoAplicacion
+        .nombreMercadoActual +
+      "."
+    );
+
+  }
+
+
+  if (
+    derivAPI.estaConectado()
+  ) {
+
+    derivAPI.suscribirseTicks(
+      estadoAplicacion
+        .simboloActual
+    );
+
+
     registrarActividad(
-      "El motor inicial de la V5 está optimizado para Rise/Fall.",
-      "advertencia"
+      "Solicitando datos del nuevo mercado."
     );
 
   }
@@ -4271,7 +5816,104 @@ function cambiarTipoOperacion() {
 
 /*
 =========================================================
-61. PROCESAR ESTADO DE DERIV
+71. MANEJAR CAMBIO DE OPERACIÓN
+=========================================================
+*/
+
+function manejarCambioOperacion() {
+
+  detenerCuentaRegresiva();
+
+
+  const operacion =
+    obtenerTextoOperacionActual();
+
+
+  estadoAplicacion
+    .ultimoResultado =
+      null;
+
+
+  prepararResultadoInicial();
+
+
+  registrarActividad(
+    "Estrategia seleccionada: " +
+    operacion +
+    "."
+  );
+
+
+  if (
+    estadoAplicacion
+      .vozActiva
+  ) {
+
+    hablarMensaje(
+      "Estrategia cambiada a " +
+      operacion +
+      "."
+    );
+
+  }
+
+}
+
+
+
+/*
+=========================================================
+72. MANEJAR CAMBIO DE MODO
+=========================================================
+*/
+
+function manejarCambioModo() {
+
+  detenerCuentaRegresiva();
+
+
+  cambiarModoAnalisis();
+
+
+  estadoAplicacion
+    .ultimoResultado =
+      null;
+
+
+  prepararResultadoInicial();
+
+
+  const modo =
+    obtenerTextoModoActual();
+
+
+  registrarActividad(
+    "Modo de análisis seleccionado: " +
+    modo +
+    "."
+  );
+
+
+  if (
+    estadoAplicacion
+      .vozActiva
+  ) {
+
+    hablarMensaje(
+      "Modo cambiado a " +
+      modo +
+      "."
+    );
+
+  }
+
+}
+
+
+
+/*
+=========================================================
+73. PROCESAR ESTADO DE DERIV
 =========================================================
 */
 
@@ -4309,6 +5951,27 @@ function procesarEstadoDeriv(
 
   if (
     estado ===
+      "conectando"
+  ) {
+
+    if (
+      interfaz.estadoDatos
+    ) {
+
+      interfaz.estadoDatos
+        .textContent =
+          "Conectando...";
+
+    }
+
+
+    return;
+
+  }
+
+
+  if (
+    estado ===
       "conectado"
   ) {
 
@@ -4317,6 +5980,41 @@ function procesarEstadoDeriv(
       "exito"
     );
 
+
+    if (
+      interfaz.estadoDatos
+    ) {
+
+      interfaz.estadoDatos
+        .textContent =
+          "Esperando precios";
+
+    }
+
+
+    derivAPI.suscribirseTicks(
+      estadoAplicacion
+        .simboloActual
+    );
+
+
+    if (
+      estadoAplicacion
+        .vozActiva
+    ) {
+
+      hablarMensaje(
+        "Conectado a " +
+        estadoAplicacion
+          .nombreMercadoActual +
+        "."
+      );
+
+    }
+
+
+    return;
+
   }
 
 
@@ -4324,6 +6022,9 @@ function procesarEstadoDeriv(
     estado ===
       "desconectado"
   ) {
+
+    detenerCuentaRegresiva();
+
 
     if (
       interfaz.estadoDatos
@@ -4335,6 +6036,12 @@ function procesarEstadoDeriv(
 
     }
 
+
+    registrarActividad(
+      "La conexión con Deriv está cerrada.",
+      "advertencia"
+    );
+
   }
 
 }
@@ -4343,7 +6050,7 @@ function procesarEstadoDeriv(
 
 /*
 =========================================================
-62. PROCESAR ERROR DE DERIV
+74. PROCESAR ERROR DE DERIV
 =========================================================
 */
 
@@ -4358,6 +6065,9 @@ function procesarErrorDeriv(
       : "Error desconocido de conexión.";
 
 
+  detenerCuentaRegresiva();
+
+
   mostrarEstadoConexion(
     "error",
     "Error"
@@ -4369,13 +6079,25 @@ function procesarErrorDeriv(
     "error"
   );
 
+
+  if (
+    estadoAplicacion
+      .vozActiva
+  ) {
+
+    hablarMensaje(
+      "Se produjo un error de conexión."
+    );
+
+  }
+
 }
 
 
 
 /*
 =========================================================
-63. PROCESAR DIAGNÓSTICO DE DERIV
+75. PROCESAR DIAGNÓSTICO DE DERIV
 =========================================================
 */
 
@@ -4414,280 +6136,7 @@ function procesarDiagnosticoDeriv(
 
 /*
 =========================================================
-64. CONFIGURAR BOTÓN CONECTAR
-=========================================================
-*/
-
-function configurarBotonConectar() {
-
-  if (
-    !interfaz.botonConectar
-  ) {
-
-    return;
-
-  }
-
-
-  interfaz.botonConectar
-    .addEventListener(
-      "click",
-      conectarConDeriv
-    );
-
-}
-
-
-
-/*
-=========================================================
-65. CONFIGURAR BOTÓN DESCONECTAR
-=========================================================
-*/
-
-function configurarBotonDesconectar() {
-
-  if (
-    !interfaz.botonDesconectar
-  ) {
-
-    return;
-
-  }
-
-
-  interfaz.botonDesconectar
-    .addEventListener(
-      "click",
-      desconectarDeDeriv
-    );
-
-}
-
-
-
-/*
-=========================================================
-66. CONFIGURAR SELECTOR DE MERCADO
-=========================================================
-*/
-
-function configurarSelectorMercado() {
-
-  if (
-    !interfaz.selectorIndice
-  ) {
-
-    return;
-
-  }
-
-
-  interfaz.selectorIndice
-    .addEventListener(
-      "change",
-      cambiarMercado
-    );
-
-}
-
-
-
-/*
-=========================================================
-67. CONFIGURAR SELECTOR DE OPERACIÓN
-=========================================================
-*/
-
-function configurarSelectorOperacion() {
-
-  if (
-    !interfaz.selectorOperacion
-  ) {
-
-    return;
-
-  }
-
-
-  interfaz.selectorOperacion
-    .addEventListener(
-      "change",
-      cambiarTipoOperacion
-    );
-
-}
-
-
-
-/*
-=========================================================
-68. CONFIGURAR SELECTOR DE MODO
-=========================================================
-*/
-
-function configurarSelectorModo() {
-
-  if (
-    !interfaz.selectorModo
-  ) {
-
-    return;
-
-  }
-
-
-  interfaz.selectorModo
-    .addEventListener(
-      "change",
-      cambiarModoAnalisis
-    );
-
-}
-
-
-
-/*
-=========================================================
-69. CONFIGURAR BOTÓN ANALIZAR
-=========================================================
-*/
-
-function configurarBotonAnalizar() {
-
-  if (
-    !interfaz.botonAnalizar
-  ) {
-
-    return;
-
-  }
-
-
-  interfaz.botonAnalizar
-    .addEventListener(
-      "click",
-      ejecutarAnalisis
-    );
-
-}
-
-
-
-/*
-=========================================================
-70. CONFIGURAR BOTÓN DE VOZ
-=========================================================
-*/
-
-function configurarBotonVoz() {
-
-  if (
-    !interfaz.botonVoz
-  ) {
-
-    return;
-
-  }
-
-
-  interfaz.botonVoz
-    .addEventListener(
-      "click",
-      leerResultadoPorVoz
-    );
-
-}
-
-
-
-/*
-=========================================================
-71. CONFIGURAR BOTÓN LIMPIAR HISTORIAL
-=========================================================
-*/
-
-function configurarBotonLimpiarHistorial() {
-
-  if (
-    !interfaz.botonLimpiarHistorial
-  ) {
-
-    return;
-
-  }
-
-
-  interfaz.botonLimpiarHistorial
-    .addEventListener(
-      "click",
-      limpiarHistorial
-    );
-
-}
-
-
-
-/*
-=========================================================
-72. CONFIGURAR BOTÓN LIMPIAR REGISTRO
-=========================================================
-*/
-
-function configurarBotonLimpiarRegistro() {
-
-  if (
-    !interfaz.botonLimpiarRegistro
-  ) {
-
-    return;
-
-  }
-
-
-  interfaz.botonLimpiarRegistro
-    .addEventListener(
-      "click",
-      limpiarRegistroActividad
-    );
-
-}
-
-
-
-/*
-=========================================================
-73. CONFIGURAR EVENTOS DE LA INTERFAZ
-=========================================================
-*/
-
-function configurarEventosInterfaz() {
-
-  configurarBotonConectar();
-
-  configurarBotonDesconectar();
-
-  configurarSelectorMercado();
-
-  configurarSelectorOperacion();
-
-  configurarSelectorModo();
-
-  configurarBotonAnalizar();
-
-  configurarBotonVoz();
-
-  configurarBotonLimpiarHistorial();
-
-  configurarBotonLimpiarRegistro();
-
-}
-
-
-
-/*
-=========================================================
-74. CONFIGURAR EVENTOS DE DERIV
+76. CONFIGURAR EVENTOS DE DERIV
 =========================================================
 */
 
@@ -4722,11 +6171,299 @@ function configurarEventosDeriv() {
 
 /*
 =========================================================
-75. PREPARAR RESULTADO INICIAL
+77. CONFIGURAR BOTÓN CONECTAR
+=========================================================
+*/
+
+function configurarBotonConectar() {
+
+  if (
+    !interfaz.botonConectar
+  ) {
+
+    return;
+
+  }
+
+
+  interfaz.botonConectar
+    .addEventListener(
+      "click",
+      conectarConDeriv
+    );
+
+}
+
+
+
+/*
+=========================================================
+78. CONFIGURAR BOTÓN DESCONECTAR
+=========================================================
+*/
+
+function configurarBotonDesconectar() {
+
+  if (
+    !interfaz.botonDesconectar
+  ) {
+
+    return;
+
+  }
+
+
+  interfaz.botonDesconectar
+    .addEventListener(
+      "click",
+      () => {
+
+        detenerCuentaRegresiva();
+
+
+        detenerVoz();
+
+
+        desconectarDeDeriv();
+
+      }
+    );
+
+}
+
+
+
+/*
+=========================================================
+79. CONFIGURAR SELECTOR DE MERCADO
+=========================================================
+*/
+
+function configurarSelectorMercado() {
+
+  if (
+    !interfaz.selectorIndice
+  ) {
+
+    return;
+
+  }
+
+
+  interfaz.selectorIndice
+    .addEventListener(
+      "change",
+      manejarCambioMercado
+    );
+
+}
+
+
+
+/*
+=========================================================
+80. CONFIGURAR SELECTOR DE OPERACIÓN
+=========================================================
+*/
+
+function configurarSelectorOperacion() {
+
+  if (
+    !interfaz.selectorOperacion
+  ) {
+
+    return;
+
+  }
+
+
+  interfaz.selectorOperacion
+    .addEventListener(
+      "change",
+      manejarCambioOperacion
+    );
+
+}
+
+
+
+/*
+=========================================================
+81. CONFIGURAR SELECTOR DE MODO
+=========================================================
+*/
+
+function configurarSelectorModo() {
+
+  if (
+    !interfaz.selectorModo
+  ) {
+
+    return;
+
+  }
+
+
+  interfaz.selectorModo
+    .addEventListener(
+      "change",
+      manejarCambioModo
+    );
+
+}
+
+
+
+/*
+=========================================================
+82. CONFIGURAR BOTÓN ANALIZAR
+=========================================================
+*/
+
+function configurarBotonAnalizar() {
+
+  if (
+    !interfaz.botonAnalizar
+  ) {
+
+    return;
+
+  }
+
+
+  interfaz.botonAnalizar
+    .addEventListener(
+      "click",
+      ejecutarAnalisisCompleto
+    );
+
+}
+
+
+
+/*
+=========================================================
+83. CONFIGURAR BOTÓN DE VOZ
+=========================================================
+*/
+
+function configurarBotonVoz() {
+
+  if (
+    !interfaz.botonVoz
+  ) {
+
+    return;
+
+  }
+
+
+  interfaz.botonVoz
+    .addEventListener(
+      "click",
+      alternarVoz
+    );
+
+}
+
+
+
+/*
+=========================================================
+84. CONFIGURAR BOTÓN LIMPIAR HISTORIAL
+=========================================================
+*/
+
+function configurarBotonLimpiarHistorial() {
+
+  if (
+    !interfaz.botonLimpiarHistorial
+  ) {
+
+    return;
+
+  }
+
+
+  interfaz.botonLimpiarHistorial
+    .addEventListener(
+      "click",
+      limpiarHistorial
+    );
+
+}
+
+
+
+/*
+=========================================================
+85. CONFIGURAR BOTÓN LIMPIAR REGISTRO
+=========================================================
+*/
+
+function configurarBotonLimpiarRegistro() {
+
+  if (
+    !interfaz.botonLimpiarRegistro
+  ) {
+
+    return;
+
+  }
+
+
+  interfaz.botonLimpiarRegistro
+    .addEventListener(
+      "click",
+      limpiarRegistroActividad
+    );
+
+}
+
+
+
+/*
+=========================================================
+86. CONFIGURAR TODOS LOS EVENTOS
+=========================================================
+*/
+
+function configurarEventosInterfaz() {
+
+  configurarBotonConectar();
+
+  configurarBotonDesconectar();
+
+  configurarSelectorMercado();
+
+  configurarSelectorOperacion();
+
+  configurarSelectorModo();
+
+  configurarBotonAnalizar();
+
+  configurarBotonVoz();
+
+  configurarBotonLimpiarHistorial();
+
+  configurarBotonLimpiarRegistro();
+
+}
+
+
+
+/*
+=========================================================
+87. PREPARAR RESULTADO INICIAL
 =========================================================
 */
 
 function prepararResultadoInicial() {
+
+  estadoAplicacion
+    .ultimoResultado =
+      null;
+
 
   if (
     interfaz.panelSenal
@@ -4818,7 +6555,7 @@ function prepararResultadoInicial() {
 
 /*
 =========================================================
-76. VERIFICAR ELEMENTOS IMPORTANTES
+88. VERIFICAR ELEMENTOS IMPORTANTES
 =========================================================
 */
 
@@ -4876,7 +6613,45 @@ function verificarElementosImportantes() {
 
 /*
 =========================================================
-77. INICIAR APLICACIÓN
+89. PREPARAR ESTADO DEL BOTÓN DE VOZ
+=========================================================
+*/
+
+function prepararBotonVoz() {
+
+  if (
+    !interfaz.botonVoz
+  ) {
+
+    return;
+
+  }
+
+
+  interfaz.botonVoz
+    .textContent =
+      estadoAplicacion
+        .vozActiva
+        ? "Voz: activada"
+        : "Voz: desactivada";
+
+
+  interfaz.botonVoz
+    .setAttribute(
+      "aria-pressed",
+      estadoAplicacion
+        .vozActiva
+        ? "true"
+        : "false"
+    );
+
+}
+
+
+
+/*
+=========================================================
+90. INICIAR APLICACIÓN
 =========================================================
 */
 
@@ -4900,6 +6675,9 @@ function iniciarAplicacion() {
   actualizarHistorialPantalla();
 
 
+  prepararBotonVoz();
+
+
   configurarEventosDeriv();
 
 
@@ -4919,19 +6697,20 @@ function iniciarAplicacion() {
       "error"
     );
 
+
     return;
 
   }
 
 
   registrarActividad(
-    "Trading Analyzer V5 cargado correctamente.",
+    "Trading Analyzer V6 cargado correctamente.",
     "exito"
   );
 
 
   registrarActividad(
-    "La conexión con Deriv está separada del motor de análisis."
+    "Mercado, estrategia e indicadores preparados."
   );
 
 
@@ -4945,7 +6724,30 @@ function iniciarAplicacion() {
 
 /*
 =========================================================
-78. INICIO SEGURO DEL DOCUMENTO
+91. DETENER PROCESOS AL CERRAR LA PÁGINA
+=========================================================
+*/
+
+window.addEventListener(
+  "beforeunload",
+  () => {
+
+    detenerCuentaRegresiva();
+
+
+    detenerVoz();
+
+
+    derivAPI.desconectar();
+
+  }
+);
+
+
+
+/*
+=========================================================
+92. INICIO SEGURO DEL DOCUMENTO
 =========================================================
 */
 
@@ -4970,6 +6772,6 @@ if (
 /*
 =========================================================
 FIN DEL ARCHIVO app.js
-TRADING ANALYZER V5
+TRADING ANALYZER V6
 =========================================================
 */
