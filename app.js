@@ -5886,27 +5886,21 @@ function procesarEstadoDeriv(
     }
 
 
-    derivAPI.suscribirseTicks(
-      estadoAplicacion
-        .simboloActual
-    );
+if (
+  estadoAplicacion
+    .vozActiva
+) {
 
+  hablarMensaje(
+    "Conectado a " +
+    estadoAplicacion
+      .nombreMercadoActual +
+    "."
+  );
 
-    if (
-      estadoAplicacion
-        .vozActiva
-    ) {
+}
 
-      hablarMensaje(
-        "Conectado a " +
-        estadoAplicacion
-          .nombreMercadoActual +
-        "."
-      );
-
-    }
-
-
+    
     return;
 
   }
