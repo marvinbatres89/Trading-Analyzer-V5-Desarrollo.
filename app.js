@@ -1090,7 +1090,7 @@ function sincronizarSeleccionActual() {
           estadoAplicacion
             .simboloActual
         );
-
+  
   }
 
 
@@ -1126,74 +1126,14 @@ function sincronizarSeleccionActual() {
   }
 
 
-  if (
-    interfaz.nombreIndice
-  ) {
+  if (interfaz.nombreIndice) {
 
-    interfaz.nombreIndice
-      .textContent =
-        estadoAplicacion
-          .nombreMercadoActual;
-
-  }
+    interfaz.nombreIndice.textContent =
+        estadoAplicacion.nombreMercadoActual;
 
 }
 
-
-
-/*
-=========================================================
-19. DETENER CUENTA REGRESIVA
-=========================================================
-*/
-
-function detenerCuentaRegresiva(
-  marcarFinalizada = false
-) {
-
-  if (
-    estadoAplicacion
-      .temporizadorSenal
-  ) {
-
-    clearInterval(
-      estadoAplicacion
-        .temporizadorSenal
-    );
-
-  }
-
-
-  estadoAplicacion
-    .temporizadorSenal =
-      null;
-
-
-  estadoAplicacion
-    .segundosRestantes =
-      0;
-
-
-  estadoAplicacion
-    .senalActiva =
-      false;
-
-
-  if (
-    interfaz.cuentaRegresiva
-  ) {
-
-    interfaz.cuentaRegresiva
-      .textContent =
-        marcarFinalizada
-          ? "Tiempo finalizado"
-          : "--";
-
-  }
-
-}
-
-
+} 
 
 /*
 =========================================================
@@ -1981,7 +1921,14 @@ function obtenerConfiguracionModo() {
         10,
 
       ventanaVolatilidad:
-        30
+        30,
+
+      vigencia:
+        CONFIGURACION
+          .duracionCompletaSegundos,
+
+      ajusteConfianza:
+        3
 
     };
 
@@ -2000,12 +1947,18 @@ function obtenerConfiguracionModo() {
       5,
 
     ventanaVolatilidad:
-      12
+      12,
+
+      vigencia:
+        CONFIGURACION
+          .duracionRapidaSegundos,
+
+      ajusteConfianza:
+        0
 
   };
 
 }
-
 
 
 /*
@@ -3464,7 +3417,7 @@ FIN DE LA PARTE 2 DE 4
 NO BORRES ESTA LÍNEA.
 LA PARTE 3 DEBE PEGARSE INMEDIATAMENTE DEBAJO.
 =========================================================
-*/8
+*/
 
 /*
 =========================================================
@@ -4220,6 +4173,7 @@ function generarResultadoRiseFall(
   indicadores
 ) {
 
+
   const combinacion =
     combinarEvaluaciones(
       [
@@ -4759,67 +4713,7 @@ function generarResultadoTecnico() {
     indicadores
   );
 
-}
-
-
-
-/*
-=========================================================
-54. LIMPIAR LISTA DE MOTIVOS
-=========================================================
-*/
-
-function limpiarMotivosResultado() {
-
-  if (
-    interfaz.prediccionMotivos
-  ) {
-
-    interfaz.prediccionMotivos
-      .innerHTML = "";
-
-  }
-
-}
-
-
-
-/*
-=========================================================
-55. AGREGAR MOTIVO AL RESULTADO
-=========================================================
-*/
-
-function agregarMotivoResultado(
-  texto
-) {
-
-  if (
-    !interfaz.prediccionMotivos
-  ) {
-
-    return;
-
-  }
-
-
-  const elemento =
-    document.createElement(
-      "li"
-    );
-
-
-  elemento.textContent =
-    texto;
-
-
-  interfaz.prediccionMotivos
-    .appendChild(
-      elemento
-    );
-
-}
-
+} 
 
 
 /*
@@ -5762,7 +5656,7 @@ function manejarCambioMercado() {
   detenerCuentaRegresiva();
 
 
-  actualizarNombreMercado();
+  sincronizarSeleccionActual();
 
 
   limpiarDatosMercado();
@@ -5798,10 +5692,10 @@ function manejarCambioMercado() {
     derivAPI.estaConectado()
   ) {
 
-    derivAPI.suscribirseTicks(
-      estadoAplicacion
-        .simboloActual
-    );
+    derivAPI.cambiarSimbolo(
+  estadoAplicacion
+    .simboloActual
+);
 
 
     registrarActividad(
@@ -6657,7 +6551,7 @@ function prepararBotonVoz() {
 
 function iniciarAplicacion() {
 
-  actualizarNombreMercado();
+  sincronizarSeleccionActual();
 
 
   mostrarEstadoConexion(
