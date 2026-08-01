@@ -1,0 +1,20 @@
+TRADING ANALYZER V7.3 — MOTOR Y VALIDACIÓN
+
+Suba estos archivos:
+index.html
+style.css
+app.js
+deriv-api.js
+manifest.webmanifest
+service-worker.js
+icon.svg
+
+Cambios:
+- Rise/Fall exige mayor coincidencia entre RSI, momentum, tendencia, flujo de ticks y volatilidad.
+- Rise/Fall se valida al finalizar 10 segundos.
+- Match, Even/Odd y Over/Under son más estrictos.
+- Se muestra el avance de pruebas, por ejemplo 3/20 PRUEBAS.
+- El puntaje técnico no se presenta como probabilidad garantizada.
+- Se conserva la cápsula flotante y la validación verde/roja.
+
+Pruebe únicamente en cuenta demo.
