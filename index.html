@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#06111c">
+  <meta name="description" content="Trading Analyzer V7 — real-time educational market analysis for Deriv synthetic indices.">
+  <title>Trading Analyzer V7</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar glass-card">
+      <div>
+        <p class="eyebrow">TRADING ANALYZER V7</p>
+        <h1>Market Intelligence</h1>
+        <p class="subtitle">Real-time educational analysis for synthetic indices.</p>
+      </div>
+      <div class="status-stack">
+        <div id="estadoConexion" class="status-pill offline"><span></span><strong id="textoEstado">OFFLINE</strong></div>
+        <div id="estadoMotor" class="status-pill engine-off"><span></span><strong>ENGINE OFF</strong></div>
+      </div>
+    </header>
+
+    <section class="glass-card controls-card">
+      <div class="section-title"><span>01</span><h2>Control Center</h2></div>
+      <div class="action-row">
+        <button id="botonConectar" class="glass-button primary" type="button">CONNECT</button>
+        <button id="botonDesconectar" class="glass-button danger" type="button" disabled>DISCONNECT</button>
+        <button id="botonEncender" class="glass-button engine" type="button" disabled>POWER ENGINE</button>
+        <button id="botonAnalizar" class="glass-button prediction" type="button" disabled>PREDICTION</button>
+        <button id="botonVoz" class="icon-button active" type="button" aria-label="Toggle voice" aria-pressed="true">🔊</button>
+      </div>
+    </section>
+
+    <section class="glass-card">
+      <div class="section-title"><span>02</span><h2>Market Setup</h2></div>
+      <div class="control-grid">
+        <label><small>MARKET</small><select id="selectorIndice">
+          <option value="1HZ10V">Volatility 10 (1s)</option>
+          <option value="1HZ25V">Volatility 25 (1s)</option>
+          <option value="1HZ50V">Volatility 50 (1s)</option>
+          <option value="1HZ75V">Volatility 75 (1s)</option>
+          <option value="1HZ100V" selected>Volatility 100 (1s)</option>
+          <option value="R_10">Volatility 10</option>
+          <option value="R_25">Volatility 25</option>
+          <option value="R_50">Volatility 50</option>
+          <option value="R_75">Volatility 75</option>
+          <option value="R_100">Volatility 100</option>
+        </select></label>
+        <label><small>STRATEGY</small><select id="selectorOperacion">
+          <option value="rise_fall" selected>Rise / Fall</option>
+          <option value="even_odd">Even / Odd</option>
+          <option value="over_under">Over / Under</option>
+          <option value="match">Match</option>
+        </select></label>
+        <label><small>ANALYSIS MODE</small><select id="selectorModo">
+          <option value="fast" selected>Fast</option>
+          <option value="complete">Complete</option>
+        </select></label>
+      </div>
+    </section>
+
+    <section class="glass-card market-card">
+      <div class="card-head">
+        <div><p class="eyebrow">LIVE MARKET</p><h2 id="nombreIndice">Volatility 100 (1s)</h2></div>
+        <span id="estadoDatos" class="data-badge">NO DATA</span>
+      </div>
+      <div id="precioActual" class="live-price">--</div>
+      <div class="metric-grid three">
+        <article><small>TICKS</small><strong id="contadorTicks">0</strong></article>
+        <article><small>LAST DIGIT</small><strong id="ultimoDigito">--</strong></article>
+        <article><small>UPDATED</small><strong id="horaActualizacion">--</strong></article>
+      </div>
+      <div class="progress-wrap">
+        <div><span id="textoProgreso">CONNECT TO START</span><strong id="numeroProgreso">0/1000</strong></div>
+        <div class="progress-track"><span id="barraDatos"></span></div>
+      </div>
+    </section>
+
+    <section class="glass-card">
+      <div class="section-title"><span>03</span><h2>Technical Signals</h2></div>
+      <div class="metric-grid four">
+        <article><small>TREND</small><strong id="tendencia">--</strong><em id="detalleTendencia">Waiting for data</em></article>
+        <article><small>RSI</small><strong id="rsi">--</strong><em id="detalleRsi">Waiting for data</em></article>
+        <article><small>MOMENTUM</small><strong id="momentum">--</strong><em id="detalleMomentum">Waiting for data</em></article>
+        <article><small>VOLATILITY</small><strong id="volatilidad">--</strong><em id="detalleVolatilidad">Waiting for data</em></article>
+      </div>
+    </section>
+
+    <section class="glass-card prediction-card">
+      <div class="section-title"><span>04</span><h2>Prediction Center</h2></div>
+      <div id="panelSenal" class="signal-panel neutral" aria-live="polite">
+        <p id="prediccionEstado" class="signal-state">ENGINE OFF</p>
+        <h3 id="prediccionTitulo">Waiting for engine</h3>
+        <div id="prediccionDireccion" class="signal-value">--</div>
+        <div class="confidence-row"><span>CONFIDENCE</span><strong id="prediccionConfianza">--</strong></div>
+        <div class="confidence-track"><span id="barraConfianza"></span></div>
+        <div class="analysis-box"><h4>WHY THIS PREDICTION</h4><ul id="prediccionMotivos"><li>Connect and power the engine.</li></ul></div>
+        <p id="vigenciaSenal" class="operation-message">No active signal</p>
+        <div id="cuentaRegresiva" class="countdown">--</div>
+      </div>
+    </section>
+
+    <section class="glass-card voice-card">
+      <div class="section-title"><span>05</span><h2>Voice Assistant</h2></div>
+      <div class="voice-grid">
+        <label><small>VOICE</small><select id="selectorVoz"></select></label>
+        <label><small>SPEED</small><input id="velocidadVoz" type="range" min="0.75" max="1.2" step="0.05" value="0.95"><output id="valorVelocidad">0.95x</output></label>
+        <label><small>PITCH</small><input id="tonoVoz" type="range" min="0.7" max="1.3" step="0.1" value="1"><output id="valorTono">1.0</output></label>
+        <label><small>VOLUME</small><input id="volumenVoz" type="range" min="0" max="1" step="0.1" value="1"><output id="valorVolumen">100%</output></label>
+      </div>
+      <button id="botonProbarVoz" class="glass-button secondary" type="button">TEST VOICE</button>
+    </section>
+
+    <section class="glass-card">
+      <div class="card-head"><div><p class="eyebrow">RECENT ACTIVITY</p><h2>Prediction History</h2></div><button id="botonLimpiarHistorial" class="text-button" type="button">CLEAR</button></div>
+      <div id="historialAnalisis" class="history"><p class="empty">No predictions generated yet.</p></div>
+    </section>
+
+    <section class="glass-card">
+      <div class="card-head"><div><p class="eyebrow">SYSTEM</p><h2>Connection Diagnostics</h2></div><button id="botonLimpiarRegistro" class="text-button" type="button">CLEAR</button></div>
+      <div id="registroActividad" class="activity"></div>
+    </section>
+
+    <footer class="footer">Educational analysis only. No prediction is guaranteed.</footer>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
