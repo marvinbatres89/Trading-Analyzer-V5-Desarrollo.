@@ -4232,11 +4232,13 @@ function generarResultadoRiseFall(
 
 
   const confianza =
-    calcularConfianza(
-      combinacion.puntaje,
-      combinacion
-        .ajusteConfianza
-    );
+  direccion === "ESPERAR"
+    ? 45
+    : calcularConfianza(
+        combinacion.puntaje,
+        combinacion
+          .ajusteConfianza
+      );
 
 
   return crearResultadoBase(
