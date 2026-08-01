@@ -1,0 +1,19 @@
+{
+  "name": "Trading Analyzer V7.3",
+  "short_name": "TA V7.3",
+  "description": "Herramienta educativa de análisis para índices sintéticos.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#030914",
+  "theme_color": "#06131f",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
